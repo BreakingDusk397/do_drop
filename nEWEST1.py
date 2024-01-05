@@ -175,7 +175,7 @@ def get_orderbook(symbol):
 
         
 
-    symbol = symbol
+    symbol = str(symbol)
     
     df = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
     """
@@ -249,7 +249,7 @@ def get_orderbook(symbol):
         midpoint_AAPL = midpoint
         df['midpoint_AAPL'] = midpoint
 
-    if symbol == 'TSLA':
+    if symbol == 'AMD':
         midpoint_TSLA = midpoint
         df['midpoint_TSLA'] = midpoint
 
@@ -279,9 +279,9 @@ def get_time_til_close(symbol):
         
     
 def get_inventory_risk(symbol):
-
+    inventory_risk = 0.00002
     try:
-        symbol = symbol
+        symbol = str(symbol)
 
         trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
     
@@ -438,7 +438,7 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     if symbol == 'AAPL':
         midpoint = midpoint_AAPL
 
-    if symbol == 'TSLA':
+    if symbol == 'AMD':
         midpoint = midpoint_TSLA
 
     mid_price = float(midpoint)
@@ -736,7 +736,7 @@ def make_model(dataset, symbol, side):
                 y = y
             if symbol == 'AAPL':
                 y = y_AAPL
-            if symbol == 'TSLA':
+            if symbol == 'AMD':
                 y = y_TSLA
 
         if str(side) == 'OrderSide.SELL':
@@ -745,10 +745,10 @@ def make_model(dataset, symbol, side):
                 y = y_sell
             if symbol == 'AAPL':
                 y = y_AAPL_sell
-            if symbol == 'TSLA':
+            if symbol == 'AMD':
                 y = y_TSLA_sell    
 
-        for symbol in ['AAPL', 'TSLA']:
+        for symbol in ['AAPL', 'AMD']:
 
             dataset['spread' + '_' + str(symbol)] = dataset['open' + '_' + str(symbol)] - ((dataset['low' + '_' + str(symbol)] + dataset['high' + '_' + str(symbol)])/2)
             dataset['spread2' + '_' + str(symbol)] = dataset['high' + '_' + str(symbol)] - dataset['low' + '_' + str(symbol)]
@@ -1079,7 +1079,7 @@ async def trade_data_handler(data):
         return ask_price_list2
 
     
-    if symbol == 'TSLA':
+    if symbol == 'AMD':
             
         timestamp3 = df[1][1]
         ask_price3 = df[1][3]
@@ -1087,7 +1087,7 @@ async def trade_data_handler(data):
         global ask_price_list_TSLA5
         global ask_price_list_TSLA2
 
-        best_bid_TSLA, best_ask_TSLA, midpoint_TSLA, df3, inventory_qty_TSLA = get_orderbook("TSLA")
+        best_bid_TSLA, best_ask_TSLA, midpoint_TSLA, df3, inventory_qty_TSLA = get_orderbook("AMD")
 
         d2_TSLA = {'close':[ask_price3],'volume':[volume3], 'Open_TSLA':[df3['Open'][-1]], 'High_TSLA':[df3['High'][-1]], 'Low_TSLA':[df3['Low'][-1]],
                         'Close_TSLA':[df3['Close'][-1]],'midpoint_TSLA':[midpoint_TSLA], 'inventory_qty_TSLA':[inventory_qty_TSLA], 'best_bid_TSLA':[best_bid_TSLA], 
@@ -1182,7 +1182,7 @@ async def create_model(data):
     print('\n Time to fetch data: \n', elapsed_time)
 
     dataset = data_out
-    symbol_list = ['MSFT', 'MSFT', 'AAPL', 'AAPL', 'TSLA', 'TSLA']
+    symbol_list = ['MSFT', 'MSFT', 'AAPL', 'AAPL', 'AMD', 'AMD']
     side_list = ['OrderSide.BUY', 'OrderSide.SELL', 'OrderSide.BUY', 'OrderSide.SELL', 'OrderSide.BUY', 'OrderSide.SELL',]
     x_list = [dataset, dataset, dataset, dataset, dataset, dataset]
     #y_list = [y, y_sell, y, y_sell]
@@ -1208,7 +1208,7 @@ async def create_model(data):
                 y_AAPL_sell.to_csv(f'/home/vboxuser/Documents/y_AAPL_sell_{now1}.csv')
 
 
-wss_client.subscribe_trades(create_model, "MSFT", "AAPL", "TSLA")
+wss_client.subscribe_trades(create_model, "MSFT", "AAPL", "AMD")
 
 wss_client.run()
 
