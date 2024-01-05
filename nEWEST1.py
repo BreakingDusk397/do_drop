@@ -701,7 +701,8 @@ def make_model(dataset, symbol, side):
         dataset = dataset.drop(['future_return'], axis=1)
 
         
-        """ dataset['future_return_AAPL'] = dataset['open_AAPL'].pct_change(future_period).shift(-future_period)
+
+        dataset['future_return_AAPL'] = dataset['open_AAPL'].pct_change(future_period).shift(-future_period)
         y_AAPL = np.sign(dataset['future_return_AAPL'])
         y_AAPL = y_AAPL.replace({-1:0})
         y_AAPL = y_AAPL.dropna()
@@ -715,58 +716,41 @@ def make_model(dataset, symbol, side):
 
         dataset = dataset.drop(['future_return_AAPL'], axis=1)
 
-        dataset['future_return_AMD'] = dataset['open_AMD'].pct_change(future_period).shift(-future_period)
-        y_AMD = np.sign(dataset['future_return_AMD'])
-        y_AMD = y_AMD.replace({-1:0})
-        y_AMD = y_AMD.dropna()
-
-        y_AMD_sell = np.sign(dataset['future_return_AMD'])
-
-        y_AMD_sell = y_AMD_sell.replace({1:0})
-        y_AMD_sell = y_AMD_sell.replace({-1:1})
-
-        y_AMD_sell = y_AMD_sell.dropna(how='any')
-
-        dataset = dataset.drop(['future_return_AMD'], axis=1)
-        """
+ 
 
         if str(side) == 'OrderSide.BUY':
             side = OrderSide.BUY
             if symbol == 'MSFT':
                 y = y
-            """if symbol == 'AAPL':
+            if symbol == 'AAPL':
                 y = y_AAPL
-            if symbol == 'AMD':
-                y = y_AMD
-            """
+
 
         if str(side) == 'OrderSide.SELL':
             side = OrderSide.SELL
             if symbol == 'MSFT':
                 y = y_sell
-            """if symbol == 'AAPL':
+            if symbol == 'AAPL':
                 y = y_AAPL_sell
-            if symbol == 'AMD':
-                y = y_AMD_sell   
-            """ 
-        """
-        for symbol in ['AAPL', 'AMD']:
+
+
+        for symbol in ['AAPL']:
 
             dataset['spread' + '_' + str(symbol)] = dataset['open' + '_' + str(symbol)] - ((dataset['low' + '_' + str(symbol)] + dataset['high' + '_' + str(symbol)])/2)
             dataset['spread2' + '_' + str(symbol)] = dataset['high' + '_' + str(symbol)] - dataset['low' + '_' + str(symbol)]
             dataset['Volatility' + '_' + str(symbol)] = (np.log(dataset['open' + '_' + str(symbol)]).ewm(span=5).std() * np.sqrt(5))
             dataset['Volatility2' + '_' + str(symbol)] = (np.log(dataset['Volatility' + '_' + str(symbol)]).ewm(span=5).std() * np.sqrt(5))
-            dataset['last_return1'] = np.log(dataset['open' + '_' + str(symbol)]).pct_change()
-            dataset['std_normalized1'] = np.log(dataset['open' + '_' + str(symbol)]).rolling(std_period).apply(std_normalized)
-            dataset['ma_ratio1'] = np.log(dataset['open' + '_' + str(symbol)]).rolling(ma_period).apply(ma_ratio)
-            dataset['price_deviation1'] = np.log(dataset['open' + '_' + str(symbol)]).rolling(price_deviation_period).apply(values_deviation)
+            dataset['last_return1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).pct_change()
+            dataset['std_normalized1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(std_period).apply(std_normalized)
+            dataset['ma_ratio1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(ma_period).apply(ma_ratio)
+            dataset['price_deviation1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(price_deviation_period).apply(values_deviation)
             #dataset['volume_deviation1'] = np.log(dataset['volume1']).rolling(volume_deviation_period).apply(values_deviation)
-            dataset['OBV1'] = stats.zscore((np.sign(dataset['open' + '_' + str(symbol)].diff()) * dataset['volume' + '_' + str(symbol)]).fillna(0).cumsum())
-            dataset['ratio'] = (dataset["open" + '_' + str(symbol)]) / (dataset["open"])
-            dataset['ratio_reversed'] = (dataset["open"]) / (dataset["open" + '_' + str(symbol)])
-            dataset['ratio_volu'] = dataset["open"].pct_change() / dataset["volume"]
-            dataset['difference'] = (dataset["open" + '_' + str(symbol)]) - (dataset["open"])
-            dataset['difference_reversed'] = (dataset["open"]) - (dataset["open" + '_' + str(symbol)])
+            dataset['OBV1'+ '_' + str(symbol)] = stats.zscore((np.sign(dataset['open' + '_' + str(symbol)].diff()) * dataset['volume' + '_' + str(symbol)]).fillna(0).cumsum())
+            dataset['ratio'+ '_' + str(symbol)] = (dataset["open" + '_' + str(symbol)]) / (dataset["open"])
+            dataset['ratio_reversed'+ '_' + str(symbol)] = (dataset["open"]) / (dataset["open" + '_' + str(symbol)])
+            dataset['ratio_volu'+ '_' + str(symbol)] = dataset["open"].pct_change() / dataset["volume"]
+            dataset['difference'+ '_' + str(symbol)] = (dataset["open" + '_' + str(symbol)]) - (dataset["open"])
+            dataset['difference_reversed'+ '_' + str(symbol)] = (dataset["open"]) - (dataset["open" + '_' + str(symbol)])
 
             #dataset['ratio_v'] = (dataset["Volatility"]) / (dataset["Volatility" + '_' + str(symbol)])
             #dataset['ratio_reversed_v'] = (dataset["Volatility" + '_' + str(symbol)]) / (dataset["Volatility"])
@@ -774,7 +758,7 @@ def make_model(dataset, symbol, side):
             #dataset['difference_v'] = (dataset["Volatility"]) - (dataset["Volatility" + '_' + str(symbol)])
             #dataset['difference_reversed_v'] = (dataset["Volatility" + '_' + str(symbol)]) - (dataset["Volatility"])
 
-        """
+
         dataset['spread'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
         dataset['Volatility'] = (np.log(dataset['open']).ewm(span=5).std() * np.sqrt(5))
@@ -799,7 +783,7 @@ def make_model(dataset, symbol, side):
             detrend(dataset[i], overwrite_data=True)
 
         for i in dataset.columns.tolist():
-            dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
+            #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
             dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
             #dataset[str(i)+'_smooth_5'] = dataset[i].ewm(span=5).mean()
             #dataset[str(i)+'_smooth_10'] = dataset[i].ewm(span=10).mean()
@@ -1034,7 +1018,7 @@ async def trade_data_handler(data):
         return ask_price_list3
 
 
-    """
+    
 
 
     if symbol == 'AAPL':
@@ -1080,7 +1064,7 @@ async def trade_data_handler(data):
         #print('\n ask_price_list_AAPL: \n', ask_price_list2)
         return ask_price_list2
 
-    
+    """
     if symbol == 'AMD':
             
         timestamp3 = df[1][1]
@@ -1122,8 +1106,7 @@ async def trade_data_handler(data):
 
         #print('\n ask_price_list_AMD2: \n', ask_price_list_AMD2)
         return ask_price_list_AMD2
-        """
-    
+    """
     
 
         
@@ -1185,9 +1168,9 @@ async def create_model(data):
     print('\n Time to fetch data: \n', elapsed_time)
 
     dataset = data_out
-    symbol_list = ['MSFT', 'MSFT']
-    side_list = ['OrderSide.BUY', 'OrderSide.SELL', ]
-    x_list = [dataset, dataset,]
+    symbol_list = ['MSFT', 'MSFT', 'AAPL', 'AAPL', ]
+    side_list = ['OrderSide.BUY', 'OrderSide.SELL', 'OrderSide.BUY', 'OrderSide.SELL', ]
+    x_list = [dataset, dataset, dataset, dataset,]
     #y_list = [y, y_sell, y, y_sell]
 
 
@@ -1197,21 +1180,10 @@ async def create_model(data):
 
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
-    if int(now1.hour) == 21:
-            if int(now1.minute) == 56:
-                dataset.to_csv(f'/home/vboxuser/Documents/dataset_{now1}.csv')
-                #dataset.to_csv(f'/home/vboxuser/Documents/dataset_AAPL_{now1}.csv')
-                y = pd.DataFrame(y)
-                y.to_csv(f'/home/vboxuser/Documents/y_{now1}.csv')
-                y_sell = pd.DataFrame(y_sell)
-                y_sell.to_csv(f'/home/vboxuser/Documents/y_sell_{now1}.csv')
-                #y_AAPL = pd.DataFrame(y_AAPL)
-                #y_AAPL.to_csv(f'/home/vboxuser/Documents/y_AAPL_{now1}.csv')
-                #y_AAPL_sell = pd.DataFrame(y_AAPL_sell)
-                #y_AAPL_sell.to_csv(f'/home/vboxuser/Documents/y_AAPL_sell_{now1}.csv')
 
 
-wss_client.subscribe_trades(create_model, "MSFT",)
+
+wss_client.subscribe_trades(create_model, "MSFT", "AAPL")
 
 wss_client.run()
 
