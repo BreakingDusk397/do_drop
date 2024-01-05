@@ -701,8 +701,7 @@ def make_model(dataset, symbol, side):
         dataset = dataset.drop(['future_return'], axis=1)
 
         
-
-        dataset['future_return_AAPL'] = dataset['open_AAPL'].pct_change(future_period).shift(-future_period)
+        """ dataset['future_return_AAPL'] = dataset['open_AAPL'].pct_change(future_period).shift(-future_period)
         y_AAPL = np.sign(dataset['future_return_AAPL'])
         y_AAPL = y_AAPL.replace({-1:0})
         y_AAPL = y_AAPL.dropna()
@@ -729,25 +728,28 @@ def make_model(dataset, symbol, side):
         y_AMD_sell = y_AMD_sell.dropna(how='any')
 
         dataset = dataset.drop(['future_return_AMD'], axis=1)
+        """
 
         if str(side) == 'OrderSide.BUY':
             side = OrderSide.BUY
             if symbol == 'MSFT':
                 y = y
-            if symbol == 'AAPL':
+            """if symbol == 'AAPL':
                 y = y_AAPL
             if symbol == 'AMD':
                 y = y_AMD
+            """
 
         if str(side) == 'OrderSide.SELL':
             side = OrderSide.SELL
             if symbol == 'MSFT':
                 y = y_sell
-            if symbol == 'AAPL':
+            """if symbol == 'AAPL':
                 y = y_AAPL_sell
             if symbol == 'AMD':
-                y = y_AMD_sell    
-
+                y = y_AMD_sell   
+            """ 
+        """
         for symbol in ['AAPL', 'AMD']:
 
             dataset['spread' + '_' + str(symbol)] = dataset['open' + '_' + str(symbol)] - ((dataset['low' + '_' + str(symbol)] + dataset['high' + '_' + str(symbol)])/2)
@@ -772,7 +774,7 @@ def make_model(dataset, symbol, side):
             #dataset['difference_v'] = (dataset["Volatility"]) - (dataset["Volatility" + '_' + str(symbol)])
             #dataset['difference_reversed_v'] = (dataset["Volatility" + '_' + str(symbol)]) - (dataset["Volatility"])
 
-
+        """
         dataset['spread'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
         dataset['Volatility'] = (np.log(dataset['open']).ewm(span=5).std() * np.sqrt(5))
@@ -797,7 +799,7 @@ def make_model(dataset, symbol, side):
             detrend(dataset[i], overwrite_data=True)
 
         for i in dataset.columns.tolist():
-            #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
+            dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
             dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
             #dataset[str(i)+'_smooth_5'] = dataset[i].ewm(span=5).mean()
             #dataset[str(i)+'_smooth_10'] = dataset[i].ewm(span=10).mean()
@@ -1032,7 +1034,7 @@ async def trade_data_handler(data):
         return ask_price_list3
 
 
-    
+    """
 
 
     if symbol == 'AAPL':
@@ -1120,6 +1122,7 @@ async def trade_data_handler(data):
 
         #print('\n ask_price_list_AMD2: \n', ask_price_list_AMD2)
         return ask_price_list_AMD2
+        """
     
     
 
@@ -1182,9 +1185,9 @@ async def create_model(data):
     print('\n Time to fetch data: \n', elapsed_time)
 
     dataset = data_out
-    symbol_list = ['MSFT', 'MSFT', 'AAPL', 'AAPL', 'AMD', 'AMD']
-    side_list = ['OrderSide.BUY', 'OrderSide.SELL', 'OrderSide.BUY', 'OrderSide.SELL', 'OrderSide.BUY', 'OrderSide.SELL',]
-    x_list = [dataset, dataset, dataset, dataset, dataset, dataset]
+    symbol_list = ['MSFT', 'MSFT']
+    side_list = ['OrderSide.BUY', 'OrderSide.SELL', ]
+    x_list = [dataset, dataset,]
     #y_list = [y, y_sell, y, y_sell]
 
 
@@ -1197,15 +1200,15 @@ async def create_model(data):
     if int(now1.hour) == 21:
             if int(now1.minute) == 56:
                 dataset.to_csv(f'/home/vboxuser/Documents/dataset_{now1}.csv')
-                dataset.to_csv(f'/home/vboxuser/Documents/dataset_AAPL_{now1}.csv')
+                #dataset.to_csv(f'/home/vboxuser/Documents/dataset_AAPL_{now1}.csv')
                 y = pd.DataFrame(y)
                 y.to_csv(f'/home/vboxuser/Documents/y_{now1}.csv')
                 y_sell = pd.DataFrame(y_sell)
                 y_sell.to_csv(f'/home/vboxuser/Documents/y_sell_{now1}.csv')
-                y_AAPL = pd.DataFrame(y_AAPL)
-                y_AAPL.to_csv(f'/home/vboxuser/Documents/y_AAPL_{now1}.csv')
-                y_AAPL_sell = pd.DataFrame(y_AAPL_sell)
-                y_AAPL_sell.to_csv(f'/home/vboxuser/Documents/y_AAPL_sell_{now1}.csv')
+                #y_AAPL = pd.DataFrame(y_AAPL)
+                #y_AAPL.to_csv(f'/home/vboxuser/Documents/y_AAPL_{now1}.csv')
+                #y_AAPL_sell = pd.DataFrame(y_AAPL_sell)
+                #y_AAPL_sell.to_csv(f'/home/vboxuser/Documents/y_AAPL_sell_{now1}.csv')
 
 
 wss_client.subscribe_trades(create_model, "MSFT", "AAPL", "AMD")
