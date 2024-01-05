@@ -74,14 +74,14 @@ trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
 
 midpoint_AAPL = 0
 midpoint_MSFT = 0
-midpoint_TSLA = 0
+midpoint_AMD = 0
 midpoint = 0
 
 def get_orderbook(symbol):
 
     global midpoint_AAPL
     global midpoint_MSFT
-    global midpoint_TSLA
+    global midpoint_AMD
 
     try:
         symbol = symbol
@@ -250,8 +250,8 @@ def get_orderbook(symbol):
         df['midpoint_AAPL'] = midpoint
 
     if symbol == 'AMD':
-        midpoint_TSLA = midpoint
-        df['midpoint_TSLA'] = midpoint
+        midpoint_AMD = midpoint
+        df['midpoint_AMD'] = midpoint
 
     return best_bid, best_ask, midpoint, df, inventory_qty
 
@@ -439,7 +439,7 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
         midpoint = midpoint_AAPL
 
     if symbol == 'AMD':
-        midpoint = midpoint_TSLA
+        midpoint = midpoint_AMD
 
     mid_price = float(midpoint)
 
@@ -716,19 +716,19 @@ def make_model(dataset, symbol, side):
 
         dataset = dataset.drop(['future_return_AAPL'], axis=1)
 
-        dataset['future_return_TSLA'] = dataset['open_TSLA'].pct_change(future_period).shift(-future_period)
-        y_TSLA = np.sign(dataset['future_return_TSLA'])
-        y_TSLA = y_TSLA.replace({-1:0})
-        y_TSLA = y_TSLA.dropna()
+        dataset['future_return_AMD'] = dataset['open_AMD'].pct_change(future_period).shift(-future_period)
+        y_AMD = np.sign(dataset['future_return_AMD'])
+        y_AMD = y_AMD.replace({-1:0})
+        y_AMD = y_AMD.dropna()
 
-        y_TSLA_sell = np.sign(dataset['future_return_TSLA'])
+        y_AMD_sell = np.sign(dataset['future_return_AMD'])
 
-        y_TSLA_sell = y_TSLA_sell.replace({1:0})
-        y_TSLA_sell = y_TSLA_sell.replace({-1:1})
+        y_AMD_sell = y_AMD_sell.replace({1:0})
+        y_AMD_sell = y_AMD_sell.replace({-1:1})
 
-        y_TSLA_sell = y_TSLA_sell.dropna(how='any')
+        y_AMD_sell = y_AMD_sell.dropna(how='any')
 
-        dataset = dataset.drop(['future_return_TSLA'], axis=1)
+        dataset = dataset.drop(['future_return_AMD'], axis=1)
 
         if str(side) == 'OrderSide.BUY':
             side = OrderSide.BUY
@@ -737,7 +737,7 @@ def make_model(dataset, symbol, side):
             if symbol == 'AAPL':
                 y = y_AAPL
             if symbol == 'AMD':
-                y = y_TSLA
+                y = y_AMD
 
         if str(side) == 'OrderSide.SELL':
             side = OrderSide.SELL
@@ -746,7 +746,7 @@ def make_model(dataset, symbol, side):
             if symbol == 'AAPL':
                 y = y_AAPL_sell
             if symbol == 'AMD':
-                y = y_TSLA_sell    
+                y = y_AMD_sell    
 
         for symbol in ['AAPL', 'AMD']:
 
@@ -977,7 +977,7 @@ wss_client = StockDataStream(API_KEY, SECRET_KEY)
 now = datetime.now()
 ask_price_list = pd.DataFrame()
 ask_price_list5 = pd.DataFrame()
-ask_price_list_TSLA5 = pd.DataFrame()
+ask_price_list_AMD5 = pd.DataFrame()
 # async handler
 async def trade_data_handler(data):
     # quote data will arrive here
@@ -1084,42 +1084,42 @@ async def trade_data_handler(data):
         timestamp3 = df[1][1]
         ask_price3 = df[1][3]
         volume3 = df[1][4]
-        global ask_price_list_TSLA5
-        global ask_price_list_TSLA2
+        global ask_price_list_AMD5
+        global ask_price_list_AMD2
 
-        best_bid_TSLA, best_ask_TSLA, midpoint_TSLA, df3, inventory_qty_TSLA = get_orderbook("AMD")
+        best_bid_AMD, best_ask_AMD, midpoint_AMD, df3, inventory_qty_AMD = get_orderbook("AMD")
 
-        d2_TSLA = {'close':[ask_price3],'volume':[volume3], 'Open_TSLA':[df3['Open'][-1]], 'High_TSLA':[df3['High'][-1]], 'Low_TSLA':[df3['Low'][-1]],
-                        'Close_TSLA':[df3['Close'][-1]],'midpoint_TSLA':[midpoint_TSLA], 'inventory_qty_TSLA':[inventory_qty_TSLA], 'best_bid_TSLA':[best_bid_TSLA], 
-                        'best_ask_TSLA':[best_ask_TSLA],
-                        'mu_TSLA':[df3['mu'][-1]], 'gamma_TSLA':[df3['gamma'][-1]], 'sigma_TSLA':[df3['sigma'][-1]], 'k_TSLA':[df3['k'][-1]],
-                        'bid_alpha_TSLA':[df3['bid_alpha'][-1]], 'ask_alpha_TSLA':[df3['ask_alpha'][-1]], 'ask_sum_delta_vol_TSLA':[df3['ask_sum_delta_vol'][-1]], 
-                        'bid_sum_delta_vol_TSLA':[df3['bid_sum_delta_vol'][-1]], 
-                        'bid_spread_aysm_TSLA':[df3['bid_spread_aysm'][-1]], 
-                        'ask_spread_aysm_TSLA':[df3['ask_spread_aysm'][-1]], 
-                        'bid_spread_aysm2_TSLA':[df3['bid_spread_aysm2'][-1]], 
-                        'ask_spread_aysm2_TSLA':[df3['ask_spread_aysm2'][-1]], }
+        d2_AMD = {'close':[ask_price3],'volume':[volume3], 'Open_AMD':[df3['Open'][-1]], 'High_AMD':[df3['High'][-1]], 'Low_AMD':[df3['Low'][-1]],
+                        'Close_AMD':[df3['Close'][-1]],'midpoint_AMD':[midpoint_AMD], 'inventory_qty_AMD':[inventory_qty_AMD], 'best_bid_AMD':[best_bid_AMD], 
+                        'best_ask_AMD':[best_ask_AMD],
+                        'mu_AMD':[df3['mu'][-1]], 'gamma_AMD':[df3['gamma'][-1]], 'sigma_AMD':[df3['sigma'][-1]], 'k_AMD':[df3['k'][-1]],
+                        'bid_alpha_AMD':[df3['bid_alpha'][-1]], 'ask_alpha_AMD':[df3['ask_alpha'][-1]], 'ask_sum_delta_vol_AMD':[df3['ask_sum_delta_vol'][-1]], 
+                        'bid_sum_delta_vol_AMD':[df3['bid_sum_delta_vol'][-1]], 
+                        'bid_spread_aysm_AMD':[df3['bid_spread_aysm'][-1]], 
+                        'ask_spread_aysm_AMD':[df3['ask_spread_aysm'][-1]], 
+                        'bid_spread_aysm2_AMD':[df3['bid_spread_aysm2'][-1]], 
+                        'ask_spread_aysm2_AMD':[df3['ask_spread_aysm2'][-1]], }
         
-        row2_TSLA = pd.DataFrame(d2_TSLA, index = [timestamp3])
+        row2_AMD = pd.DataFrame(d2_AMD, index = [timestamp3])
                 
-        ask_price_list_TSLA5 = pd.concat([ask_price_list_TSLA5, row2_TSLA])
-        volume_TSLA2 = ask_price_list_TSLA5['volume'].resample('10S').sum()
+        ask_price_list_AMD5 = pd.concat([ask_price_list_AMD5, row2_AMD])
+        volume_AMD2 = ask_price_list_AMD5['volume'].resample('10S').sum()
 
 
-        ask_price_list_TSLA2 = ask_price_list_TSLA5['close'].resample('10S').ohlc()
-        ask_price_list_TSLA2 = pd.merge(left=ask_price_list_TSLA2, right=volume_TSLA2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-        #ask_price_list_TSLA2.drop(ask_price_list_TSLA2.filter(regex='_y$').columns, axis=1, inplace=True)
+        ask_price_list_AMD2 = ask_price_list_AMD5['close'].resample('10S').ohlc()
+        ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=volume_AMD2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
+        #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
 
-        for i in ['Open_TSLA', 'High_TSLA','Low_TSLA','Close_TSLA','best_bid_TSLA', 'best_ask_TSLA', 'midpoint_TSLA', 'inventory_qty_TSLA', 'best_bid_TSLA', 'best_ask_TSLA','mu_TSLA','gamma_TSLA','sigma_TSLA','k_TSLA', 'bid_alpha_TSLA', 'ask_alpha_TSLA', 'ask_sum_delta_vol_TSLA', 'bid_sum_delta_vol_TSLA', 'bid_spread_aysm_TSLA', 'ask_spread_aysm_TSLA', 'bid_spread_aysm2_TSLA', 'ask_spread_aysm2_TSLA',]:
-            ask_price_list_temp_TSLA = ask_price_list_TSLA5[i].resample('10S').mean()
-            ask_price_list_TSLA2 = pd.merge(left=ask_price_list_TSLA2, right=ask_price_list_temp_TSLA, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-            #ask_price_list_TSLA2.drop(ask_price_list_TSLA2.filter(regex='_y$').columns, axis=1, inplace=True)
+        for i in ['Open_AMD', 'High_AMD','Low_AMD','Close_AMD','best_bid_AMD', 'best_ask_AMD', 'midpoint_AMD', 'inventory_qty_AMD', 'best_bid_AMD', 'best_ask_AMD','mu_AMD','gamma_AMD','sigma_AMD','k_AMD', 'bid_alpha_AMD', 'ask_alpha_AMD', 'ask_sum_delta_vol_AMD', 'bid_sum_delta_vol_AMD', 'bid_spread_aysm_AMD', 'ask_spread_aysm_AMD', 'bid_spread_aysm2_AMD', 'ask_spread_aysm2_AMD',]:
+            ask_price_list_temp_AMD = ask_price_list_AMD5[i].resample('10S').mean()
+            ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=ask_price_list_temp_AMD, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
+            #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
         
-        ask_price_list_TSLA2 = ask_price_list_TSLA2.ffill()
-        ask_price_list_TSLA2 = ask_price_list_TSLA2.rename(columns={"open":"open_TSLA", "high":"high_TSLA", "low":"low_TSLA", "close":"close_TSLA", "volume":"volume_TSLA"})
+        ask_price_list_AMD2 = ask_price_list_AMD2.ffill()
+        ask_price_list_AMD2 = ask_price_list_AMD2.rename(columns={"open":"open_AMD", "high":"high_AMD", "low":"low_AMD", "close":"close_AMD", "volume":"volume_AMD"})
 
-        #print('\n ask_price_list_TSLA2: \n', ask_price_list_TSLA2)
-        return ask_price_list_TSLA2
+        #print('\n ask_price_list_AMD2: \n', ask_price_list_AMD2)
+        return ask_price_list_AMD2
     
     
 
@@ -1127,7 +1127,7 @@ async def trade_data_handler(data):
         
 
     """ask_price_list4 = pd.merge(left=ask_price_list3, right=ask_price_list2, left_index=True, right_index=True)
-    ask_price_list4 = pd.merge(left=ask_price_list4, right=ask_price_list_TSLA2, left_index=True, right_index=True)
+    ask_price_list4 = pd.merge(left=ask_price_list4, right=ask_price_list_AMD2, left_index=True, right_index=True)
     
     ask_price_list4 = ask_price_list4.ffill()
     print('\n latest merged df: \n', ask_price_list4)
