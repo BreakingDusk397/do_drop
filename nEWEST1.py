@@ -72,14 +72,14 @@ SECRET_KEY = "laKd5n4c7pnjRT9nC6WJztVEWruDz2b1VDJab5Hg"
 
 trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
 
-midpoint_AAPL = 0
+midpoint_TSLA = 0
 midpoint_MSFT = 0
 midpoint_AMD = 0
 midpoint = 0
 
 def get_orderbook(symbol):
 
-    global midpoint_AAPL
+    global midpoint_TSLA
     global midpoint_MSFT
     global midpoint_AMD
 
@@ -245,9 +245,9 @@ def get_orderbook(symbol):
         midpoint_MSFT = midpoint
         df['midpoint_MSFT'] = midpoint
 
-    if symbol == 'AAPL':
-        midpoint_AAPL = midpoint
-        df['midpoint_AAPL'] = midpoint
+    if symbol == 'TSLA':
+        midpoint_TSLA = midpoint
+        df['midpoint_TSLA'] = midpoint
 
     if symbol == 'AMD':
         midpoint_AMD = midpoint
@@ -290,9 +290,9 @@ def get_inventory_risk(symbol):
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "MSFT":
-            inventory_risk = 0.00002 * abs(inventory_qty)
+            inventory_risk = 0.000002 * abs(inventory_qty)
 
-        if symbol == 'AAPL':
+        if symbol == 'TSLA':
             inventory_risk = 0.00002 * abs(inventory_qty)
 
     except:
@@ -435,8 +435,8 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     if symbol == 'MSFT':
         midpoint = midpoint_MSFT
 
-    if symbol == 'AAPL':
-        midpoint = midpoint_AAPL
+    if symbol == 'TSLA':
+        midpoint = midpoint_TSLA
 
     if symbol == 'AMD':
         midpoint = midpoint_AMD
@@ -686,7 +686,7 @@ def make_model(dataset, symbol, side):
         #dataset['volume'] = dataset['volume']/1000
         #print('dataset: ', dataset)
         #dataset = dataset[-400:]
-        dataset_AAPL = dataset
+        dataset_TSLA = dataset
 
         
         dataset['future_return'] = dataset['open'].pct_change(future_period).shift(-future_period)
@@ -702,19 +702,19 @@ def make_model(dataset, symbol, side):
 
         
 
-        dataset['future_return_AAPL'] = dataset['open_AAPL'].pct_change(future_period).shift(-future_period)
-        y_AAPL = np.sign(dataset['future_return_AAPL'])
-        y_AAPL = y_AAPL.replace({-1:0})
-        y_AAPL = y_AAPL.dropna()
+        dataset['future_return_TSLA'] = dataset['open_TSLA'].pct_change(future_period).shift(-future_period)
+        y_TSLA = np.sign(dataset['future_return_TSLA'])
+        y_TSLA = y_TSLA.replace({-1:0})
+        y_TSLA = y_TSLA.dropna()
 
-        y_AAPL_sell = np.sign(dataset['future_return_AAPL'])
+        y_TSLA_sell = np.sign(dataset['future_return_TSLA'])
 
-        y_AAPL_sell = y_AAPL_sell.replace({1:0})
-        y_AAPL_sell = y_AAPL_sell.replace({-1:1})
+        y_TSLA_sell = y_TSLA_sell.replace({1:0})
+        y_TSLA_sell = y_TSLA_sell.replace({-1:1})
 
-        y_AAPL_sell = y_AAPL_sell.dropna(how='any')
+        y_TSLA_sell = y_TSLA_sell.dropna(how='any')
 
-        dataset = dataset.drop(['future_return_AAPL'], axis=1)
+        dataset = dataset.drop(['future_return_TSLA'], axis=1)
 
  
 
@@ -722,19 +722,19 @@ def make_model(dataset, symbol, side):
             side = OrderSide.BUY
             if symbol == 'MSFT':
                 y = y
-            if symbol == 'AAPL':
-                y = y_AAPL
+            if symbol == 'TSLA':
+                y = y_TSLA
 
 
         if str(side) == 'OrderSide.SELL':
             side = OrderSide.SELL
             if symbol == 'MSFT':
                 y = y_sell
-            if symbol == 'AAPL':
-                y = y_AAPL_sell
+            if symbol == 'TSLA':
+                y = y_TSLA_sell
 
 
-        for symbol in ['AAPL']:
+        for symbol in ['TSLA']:
 
             dataset['spread' + '_' + str(symbol)] = dataset['open' + '_' + str(symbol)] - ((dataset['low' + '_' + str(symbol)] + dataset['high' + '_' + str(symbol)])/2)
             dataset['spread2' + '_' + str(symbol)] = dataset['high' + '_' + str(symbol)] - dataset['low' + '_' + str(symbol)]
@@ -814,8 +814,8 @@ def make_model(dataset, symbol, side):
 
 
         last_input = dataset[-2:]
-        dataset_AAPL = dataset
-        last_input_AAPL = dataset_AAPL[-2:]
+        dataset_TSLA = dataset
+        last_input_TSLA = dataset_TSLA[-2:]
         
         #print('\n last input: \n', last_input)
 
@@ -841,7 +841,7 @@ def make_model(dataset, symbol, side):
         
         
         dataset = dataset[dataset.index.isin(y.index)]
-        #dataset_AAPL = dataset_AAPL[dataset_AAPL.index.isin(y_AAPL.index)]
+        #dataset_TSLA = dataset_TSLA[dataset_TSLA.index.isin(y_TSLA.index)]
 
 
         
@@ -1021,7 +1021,7 @@ async def trade_data_handler(data):
     
 
 
-    if symbol == 'AAPL':
+    if symbol == 'TSLA':
             
         timestamp2 = df[1][1]
         ask_price2 = df[1][3]
@@ -1029,19 +1029,19 @@ async def trade_data_handler(data):
         global ask_price_list5
         global ask_price_list2
 
-        best_bid_AAPL, best_ask_AAPL, midpoint_AAPL, df2, inventory_qty_AAPL = get_orderbook("AAPL")
+        best_bid_TSLA, best_ask_TSLA, midpoint_TSLA, df2, inventory_qty_TSLA = get_orderbook("TSLA")
 
-        d2 = {'close':[ask_price2],'volume':[volume2], 'Open_AAPL':[df2['Open'][-1]], 'High_AAPL':[df2['High'][-1]], 'Low_AAPL':[df2['Low'][-1]],
-                'Close_AAPL':[df2['Close'][-1]],'midpoint_AAPL':[midpoint_AAPL], 'inventory_qty_AAPL':[inventory_qty_AAPL], 
-                'best_bid_AAPL':[best_bid_AAPL], 'best_ask_AAPL':[best_ask_AAPL],
-                'mu_AAPL':[df2['mu'][-1]], 'gamma_AAPL':[df2['gamma'][-1]], 'sigma_AAPL':[df2['sigma'][-1]], 'k_AAPL':[df2['k'][-1]],
-                'bid_alpha_AAPL':[df2['bid_alpha'][-1]], 'ask_alpha_AAPL':[df2['ask_alpha'][-1]], 'ask_sum_delta_vol_AAPL':[df2['ask_sum_delta_vol'][-1]], 
-                'bid_sum_delta_vol_AAPL':[df2['bid_sum_delta_vol'][-1]], 
-                'bid_spread_aysm_AAPL':[df2['bid_spread_aysm'][-1]], 
-                'ask_spread_aysm_AAPL':[df2['ask_spread_aysm'][-1]], 
-                'inventory_AAPL':[df2['inventory'][-1]],
-                'bid_spread_aysm2_AAPL':[df2['bid_spread_aysm2'][-1]], 
-                'ask_spread_aysm2_AAPL':[df2['ask_spread_aysm2'][-1]], }
+        d2 = {'close':[ask_price2],'volume':[volume2], 'Open_TSLA':[df2['Open'][-1]], 'High_TSLA':[df2['High'][-1]], 'Low_TSLA':[df2['Low'][-1]],
+                'Close_TSLA':[df2['Close'][-1]],'midpoint_TSLA':[midpoint_TSLA], 'inventory_qty_TSLA':[inventory_qty_TSLA], 
+                'best_bid_TSLA':[best_bid_TSLA], 'best_ask_TSLA':[best_ask_TSLA],
+                'mu_TSLA':[df2['mu'][-1]], 'gamma_TSLA':[df2['gamma'][-1]], 'sigma_TSLA':[df2['sigma'][-1]], 'k_TSLA':[df2['k'][-1]],
+                'bid_alpha_TSLA':[df2['bid_alpha'][-1]], 'ask_alpha_TSLA':[df2['ask_alpha'][-1]], 'ask_sum_delta_vol_TSLA':[df2['ask_sum_delta_vol'][-1]], 
+                'bid_sum_delta_vol_TSLA':[df2['bid_sum_delta_vol'][-1]], 
+                'bid_spread_aysm_TSLA':[df2['bid_spread_aysm'][-1]], 
+                'ask_spread_aysm_TSLA':[df2['ask_spread_aysm'][-1]], 
+                'inventory_TSLA':[df2['inventory'][-1]],
+                'bid_spread_aysm2_TSLA':[df2['bid_spread_aysm2'][-1]], 
+                'ask_spread_aysm2_TSLA':[df2['ask_spread_aysm2'][-1]], }
         
         row2 = pd.DataFrame(d2, index = [timestamp2])
                 
@@ -1053,15 +1053,15 @@ async def trade_data_handler(data):
         ask_price_list2 = pd.merge(left=ask_price_list2, right=volume2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
 
-        for i in ['Open_AAPL', 'High_AAPL','Low_AAPL','Close_AAPL', 'midpoint_AAPL', 'inventory_qty_AAPL', 'best_bid_AAPL', 'best_ask_AAPL','mu_AAPL','gamma_AAPL','sigma_AAPL','k_AAPL', 'bid_alpha_AAPL', 'ask_alpha_AAPL', 'ask_sum_delta_vol_AAPL', 'bid_sum_delta_vol_AAPL', 'bid_spread_aysm_AAPL', 'ask_spread_aysm_AAPL', 'bid_spread_aysm2_AAPL', 'ask_spread_aysm2_AAPL',]:
+        for i in ['Open_TSLA', 'High_TSLA','Low_TSLA','Close_TSLA', 'midpoint_TSLA', 'inventory_qty_TSLA', 'best_bid_TSLA', 'best_ask_TSLA','mu_TSLA','gamma_TSLA','sigma_TSLA','k_TSLA', 'bid_alpha_TSLA', 'ask_alpha_TSLA', 'ask_sum_delta_vol_TSLA', 'bid_sum_delta_vol_TSLA', 'bid_spread_aysm_TSLA', 'ask_spread_aysm_TSLA', 'bid_spread_aysm2_TSLA', 'ask_spread_aysm2_TSLA',]:
             ask_price_list_temp = ask_price_list5[i].resample('10S').mean()
             ask_price_list2 = pd.merge(left=ask_price_list2, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
         
         ask_price_list2 = ask_price_list2.ffill()
-        ask_price_list2 = ask_price_list2.rename(columns={"open":"open_AAPL", "high":"high_AAPL", "low":"low_AAPL", "close":"close_AAPL", "volume":"volume_AAPL"})
+        ask_price_list2 = ask_price_list2.rename(columns={"open":"open_TSLA", "high":"high_TSLA", "low":"low_TSLA", "close":"close_TSLA", "volume":"volume_TSLA"})
 
-        #print('\n ask_price_list_AAPL: \n', ask_price_list2)
+        #print('\n ask_price_list_TSLA: \n', ask_price_list2)
         return ask_price_list2
 
     """
@@ -1168,7 +1168,7 @@ async def create_model(data):
     print('\n Time to fetch data: \n', elapsed_time)
 
     dataset = data_out
-    symbol_list = ['MSFT', 'MSFT', 'AAPL', 'AAPL', ]
+    symbol_list = ['MSFT', 'MSFT', 'TSLA', 'TSLA', ]
     side_list = ['OrderSide.BUY', 'OrderSide.SELL', 'OrderSide.BUY', 'OrderSide.SELL', ]
     x_list = [dataset, dataset, dataset, dataset,]
     #y_list = [y, y_sell, y, y_sell]
@@ -1183,7 +1183,7 @@ async def create_model(data):
 
 
 
-wss_client.subscribe_trades(create_model, "MSFT", "AAPL")
+wss_client.subscribe_trades(create_model, "MSFT", "TSLA")
 
 wss_client.run()
 
