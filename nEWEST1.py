@@ -402,7 +402,7 @@ def take_profit_method(symbol):
 
 
 
-
+@jit
 def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multiplier, loss_limit_multiplier, qty, inventory_risk):
     
     symbol = str(symbol)
@@ -630,21 +630,21 @@ def metric(y_true, y_pred):
     plt.show()"""
 
 
-
+@jit
 def std_normalized(vals):
     return np.std(vals) / np.mean(vals)
 
 # Ratio of diff between last price and mean value to last price
-
+@jit
 def ma_ratio(vals):
     return (vals[-1] - np.mean(vals)) / vals[-1]
 
 # z-score for volumes and price
-
+@jit
 def values_deviation(vals):
     return (vals[-1] - np.mean(vals)) / np.std(vals)
 
-
+@jit
 def z_score(vals):
     vals = np.log(vals)
     vals = ((vals - vals.expanding().mean())/vals.expanding().std()).pct_change()
@@ -655,7 +655,7 @@ def z_score_df(df):
     df = df.apply(lambda x : z_score(x))
     return df
 
-
+@jit
 def make_model(dataset, symbol, side):
         
         t0 = time.time()
@@ -797,7 +797,7 @@ def make_model(dataset, symbol, side):
             detrend(dataset[i], overwrite_data=True)
 
         for i in dataset.columns.tolist():
-            dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
+            #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
             dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
             #dataset[str(i)+'_smooth_5'] = dataset[i].ewm(span=5).mean()
             #dataset[str(i)+'_smooth_10'] = dataset[i].ewm(span=10).mean()
