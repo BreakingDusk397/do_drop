@@ -1211,7 +1211,7 @@ async def create_model(data):
                 #y_AAPL_sell.to_csv(f'/home/vboxuser/Documents/y_AAPL_sell_{now1}.csv')
 
 
-wss_client.subscribe_trades(create_model, "MSFT", "AAPL", "AMD")
+wss_client.subscribe_trades(create_model, "MSFT",)
 
 wss_client.run()
 
