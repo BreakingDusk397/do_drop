@@ -729,23 +729,23 @@ def make_model(dataset, symbol, side):
                 y = y_TSLA_sell
 
 
-        for symbol in ['TSLA']:
+        for symbol in ['TSLA','NVDA']:
 
-            dataset['spread' + '_' + str(symbol)] = dataset['open' + '_' + str(symbol)] - ((dataset['low' + '_' + str(symbol)] + dataset['high' + '_' + str(symbol)])/2)
-            dataset['spread2' + '_' + str(symbol)] = dataset['high' + '_' + str(symbol)] - dataset['low' + '_' + str(symbol)]
-            dataset['Volatility' + '_' + str(symbol)] = (np.log(dataset['open' + '_' + str(symbol)]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
+            dataset['spread' + '_' + str(symbol)] = dataset['Open' + '_' + str(symbol)] - ((dataset['Low' + '_' + str(symbol)] + dataset['High' + '_' + str(symbol)])/2)
+            dataset['spread2' + '_' + str(symbol)] = dataset['High' + '_' + str(symbol)] - dataset['Low' + '_' + str(symbol)]
+            dataset['Volatility' + '_' + str(symbol)] = (np.log(dataset['Open' + '_' + str(symbol)]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
             dataset['Volatility2' + '_' + str(symbol)] = (np.log(dataset['Volatility' + '_' + str(symbol)]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
-            dataset['last_return1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).pct_change()
-            dataset['std_normalized1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-            dataset['ma_ratio1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(ma_period).apply(ma_ratio, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+            dataset['last_return1'+ '_' + str(symbol)] = np.log(dataset['Open' + '_' + str(symbol)]).pct_change()
+            dataset['std_normalized1'+ '_' + str(symbol)] = np.log(dataset['Open' + '_' + str(symbol)]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+            dataset['ma_ratio1'+ '_' + str(symbol)] = np.log(dataset['Open' + '_' + str(symbol)]).rolling(ma_period).apply(ma_ratio, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
             #dataset['price_deviation1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
             #dataset['volume_deviation1'] = np.log(dataset['volume1']).rolling(volume_deviation_period).apply(values_deviation)
-            dataset['OBV1'+ '_' + str(symbol)] = stats.zscore((np.sign(dataset['open' + '_' + str(symbol)].diff()) * dataset['volume' + '_' + str(symbol)]).fillna(0.0000001).cumsum())
-            dataset['ratio'+ '_' + str(symbol)] = (dataset["open" + '_' + str(symbol)]) / (dataset["open"])
-            dataset['ratio_reversed'+ '_' + str(symbol)] = (dataset["open"]) / (dataset["open" + '_' + str(symbol)])
-            dataset['ratio_volu'+ '_' + str(symbol)] = dataset["open"].pct_change() / dataset["volume"]
-            dataset['difference'+ '_' + str(symbol)] = (dataset["open" + '_' + str(symbol)]) - (dataset["open"])
-            dataset['difference_reversed'+ '_' + str(symbol)] = (dataset["open"]) - (dataset["open" + '_' + str(symbol)])
+            dataset['OBV1'+ '_' + str(symbol)] = stats.zscore((np.sign(dataset['Open' + '_' + str(symbol)].diff()) * dataset['Volume' + '_' + str(symbol)]).fillna(0.0000001).cumsum())
+            dataset['ratio'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) / (dataset["Open"])
+            dataset['ratio_reversed'+ '_' + str(symbol)] = (dataset["Open"]) / (dataset["Open" + '_' + str(symbol)])
+            dataset['ratio_volu'+ '_' + str(symbol)] = dataset["Open"].pct_change() / dataset["volume"]
+            dataset['difference'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) - (dataset["Open"])
+            dataset['difference_reversed'+ '_' + str(symbol)] = (dataset["Open"]) - (dataset["Open" + '_' + str(symbol)])
 
             #dataset['ratio_v'] = (dataset["Volatility"]) / (dataset["Volatility" + '_' + str(symbol)])
             #dataset['ratio_reversed_v'] = (dataset["Volatility" + '_' + str(symbol)]) / (dataset["Volatility"])
@@ -989,9 +989,9 @@ async def trade_data_handler(data):
         global ask_price_list3
         best_bid_NVDA, best_ask_NVDA, midpoint_NVDA, df1, inventory_qty_NVDA = get_orderbook("NVDA")
 
-        d = {'close':[ask_price],'volume':[volume], 'Open':float(df1['Open'][-1]), 'High':[df1['High'][-1]],
-                'Low':[df1['Low'][-1]], 'Close':[df1['Close'][-1]], 
-                'Volume':[df1['Volume'][-1]],
+        d = {'close':[ask_price],'volume':[volume], 'Open_NVDA':float(df1['Open'][-1]), 'High_NVDA':[df1['High'][-1]],
+                'Low_NVDA':[df1['Low'][-1]], 'Close_NVDA':[df1['Close'][-1]], 
+                'Volume_NVDA':[df1['Volume'][-1]],
                 'mu_NVDA':[df1['mu'][-1]], 'gamma_NVDA':[df1['gamma'][-1]], 'sigma_NVDA':[df1['sigma'][-1]], 'k_NVDA':[df1['k'][-1]],
                 'bid_alpha_NVDA':[df1['bid_alpha'][-1]], 'ask_alpha_NVDA':[df1['ask_alpha'][-1]],
                 'ask_sum_delta_vol_NVDA':[df1['ask_sum_delta_vol'][-1]], 
@@ -1012,7 +1012,7 @@ async def trade_data_handler(data):
         ask_price_list3 = ask_price_list['close'].resample('30S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
-        for i in ['Open', 'High','Low','Close', 'Volume', 'best_bid_NVDA', 'inventory_NVDA', 'best_ask_NVDA', 'midpoint_NVDA', 'mu_NVDA','gamma_NVDA','sigma_NVDA','k_NVDA', 'bid_alpha_NVDA', 'ask_alpha_NVDA', 'ask_sum_delta_vol_NVDA', 'bid_sum_delta_vol_NVDA', 'bid_spread_aysm2_NVDA', 'ask_spread_aysm2_NVDA',]:
+        for i in ['Open_NVDA', 'High_NVDA','Low_NVDA','Close_NVDA', 'Volume_NVDA', 'best_bid_NVDA', 'inventory_NVDA', 'best_ask_NVDA', 'midpoint_NVDA', 'mu_NVDA','gamma_NVDA','sigma_NVDA','k_NVDA', 'bid_alpha_NVDA', 'ask_alpha_NVDA', 'ask_sum_delta_vol_NVDA', 'bid_sum_delta_vol_NVDA', 'bid_spread_aysm2_NVDA', 'ask_spread_aysm2_NVDA',]:
             ask_price_list_temp = ask_price_list[i].resample('30S').mean()
             ask_price_list3 = pd.merge(left=ask_price_list3, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
