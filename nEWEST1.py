@@ -869,7 +869,7 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=test_dataset, features_for_select=list(dataset.columns), num_features_to_select=10, steps=5, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
+        selected_features = catboost_class.select_features(train_dataset, eval_set=test_dataset, features_for_select=list(dataset.columns), num_features_to_select=15, steps=10, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
@@ -896,7 +896,7 @@ def make_model(dataset, symbol, side):
             
         }
         tscv = TimeSeriesSplit(n_splits=5, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=4, min_resources=1, max_resources=20, cv=tscv, verbose=1, scoring='f1_weighted')
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=4, min_resources=2, max_resources=30, cv=tscv, verbose=1, scoring='f1_weighted')
 
         rscv.fit(dataset[-(len(y)):], y)
 
@@ -928,6 +928,16 @@ def make_model(dataset, symbol, side):
 
             if str(side) == 'OrderSide.BUY':
                 spread = -0.02
+
+                limit_order(symbol=symbol, 
+                            spread=spread, 
+                            side=side, 
+                            take_profit_multiplier = 2,
+                            loss_stop_multiplier = 2,
+                            loss_limit_multiplier = 2.1,
+                            qty = 100,
+                            inventory_risk = get_inventory_risk(symbol=symbol)
+                            )
 
 
             if str(side) == 'OrderSide.SELL':
