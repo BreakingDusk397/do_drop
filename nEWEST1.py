@@ -84,6 +84,7 @@ best_ask = 0.02
 bid_sum_delta_vol = 10000
 ask_sum_delta_vol = 10000
 previous_df = 0
+df = 0
 
 
 def get_orderbook(symbol):
