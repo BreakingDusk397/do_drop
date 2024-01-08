@@ -655,7 +655,7 @@ def z_score_df(df):
 
 @jit
 def make_model(dataset, symbol, side):
-        
+    try: 
         t0 = time.time()
 
         symbol = str(symbol)
@@ -860,14 +860,14 @@ def make_model(dataset, symbol, side):
         test_dataset = cb.Pool(X_test, y_test)
         valid_dataset = cb.Pool(X_valid, y_valid)
         
-        catboost_class = CatBoostClassifier(iterations=300, early_stopping_rounds=10, silent=True, thread_count=-1)
+        catboost_class = CatBoostClassifier(iterations=300, early_stopping_rounds=5, silent=True, thread_count=-1)
         """
         my_file = Path(f'model_{symbol}_{side}') # file path for persistant model
         if my_file.exists():
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=test_dataset, features_for_select=list(dataset.columns), num_features_to_select=10, steps=5, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, verbose=False)
+        selected_features = catboost_class.select_features(train_dataset, eval_set=test_dataset, features_for_select=list(dataset.columns), num_features_to_select=10, steps=5, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
@@ -915,7 +915,7 @@ def make_model(dataset, symbol, side):
 
         CatBoost_pred = int(y_pred_test[-1:])
         #previous_CatBoost = int(y_pred_test[-2:-1])
-        print("last CatBoost_buy output: ", CatBoost_pred)
+        print("last", str(symbol), str(side), "output: ", CatBoost_pred)
 
         
 
@@ -946,7 +946,9 @@ def make_model(dataset, symbol, side):
         t1 = time.time()
         total = t1-t0
         print('\n Total time to order: \n', total)
-
+    except:
+        print("model error.")  
+        print(traceback.format_exc())
 
 
 
@@ -1005,13 +1007,13 @@ async def trade_data_handler(data):
         #print('\n row: \n', row)
         
         ask_price_list = pd.concat([ask_price_list, row])
-        volume = ask_price_list['volume'].resample('20S').sum()
+        volume = ask_price_list['volume'].resample('30S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('20S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('30S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
         for i in ['Open', 'High','Low','Close', 'Volume', 'best_bid_NVDA', 'inventory_NVDA', 'best_ask_NVDA', 'midpoint_NVDA', 'mu_NVDA','gamma_NVDA','sigma_NVDA','k_NVDA', 'bid_alpha_NVDA', 'ask_alpha_NVDA', 'ask_sum_delta_vol_NVDA', 'bid_sum_delta_vol_NVDA', 'bid_spread_aysm2_NVDA', 'ask_spread_aysm2_NVDA',]:
-            ask_price_list_temp = ask_price_list[i].resample('20S').mean()
+            ask_price_list_temp = ask_price_list[i].resample('30S').mean()
             ask_price_list3 = pd.merge(left=ask_price_list3, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
 
@@ -1050,15 +1052,15 @@ async def trade_data_handler(data):
         row2 = pd.DataFrame(d2, index = [timestamp2])
                 
         ask_price_list5 = pd.concat([ask_price_list5, row2])
-        volume2 = ask_price_list5['volume'].resample('20S').sum()
+        volume2 = ask_price_list5['volume'].resample('30S').sum()
 
 
-        ask_price_list2 = ask_price_list5['close'].resample('20S').ohlc()
+        ask_price_list2 = ask_price_list5['close'].resample('30S').ohlc()
         ask_price_list2 = pd.merge(left=ask_price_list2, right=volume2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
 
         for i in ['Open_TSLA', 'High_TSLA','Low_TSLA','Close_TSLA', 'midpoint_TSLA', 'best_bid_TSLA','inventory_TSLA', 'best_ask_TSLA','mu_TSLA','gamma_TSLA','sigma_TSLA','k_TSLA', 'bid_alpha_TSLA', 'ask_alpha_TSLA', 'ask_sum_delta_vol_TSLA', 'bid_sum_delta_vol_TSLA', 'bid_spread_aysm2_TSLA', 'ask_spread_aysm2_TSLA',]:
-            ask_price_list_temp = ask_price_list5[i].resample('20S').mean()
+            ask_price_list_temp = ask_price_list5[i].resample('30S').mean()
             ask_price_list2 = pd.merge(left=ask_price_list2, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
         
@@ -1095,15 +1097,15 @@ async def trade_data_handler(data):
         row2_AMD = pd.DataFrame(d2_AMD, index = [timestamp3])
                 
         ask_price_list_AMD5 = pd.concat([ask_price_list_AMD5, row2_AMD])
-        volume_AMD2 = ask_price_list_AMD5['volume'].resample('20S').sum()
+        volume_AMD2 = ask_price_list_AMD5['volume'].resample('30S').sum()
 
 
-        ask_price_list_AMD2 = ask_price_list_AMD5['close'].resample('20S').ohlc()
+        ask_price_list_AMD2 = ask_price_list_AMD5['close'].resample('30S').ohlc()
         ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=volume_AMD2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
 
         for i in ['Open_AMD', 'High_AMD','Low_AMD','Close_AMD','best_bid_AMD', 'best_ask_AMD', 'midpoint_AMD', 'inventory_qty_AMD', 'best_bid_AMD', 'best_ask_AMD','mu_AMD','gamma_AMD','sigma_AMD','k_AMD', 'bid_alpha_AMD', 'ask_alpha_AMD', 'ask_sum_delta_vol_AMD', 'bid_sum_delta_vol_AMD', 'bid_spread_aysm_AMD', 'ask_spread_aysm_AMD', 'bid_spread_aysm2_AMD', 'ask_spread_aysm2_AMD',]:
-            ask_price_list_temp_AMD = ask_price_list_AMD5[i].resample('20S').mean()
+            ask_price_list_temp_AMD = ask_price_list_AMD5[i].resample('30S').mean()
             ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=ask_price_list_temp_AMD, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
         
