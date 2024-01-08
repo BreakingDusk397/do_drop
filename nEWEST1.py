@@ -653,7 +653,7 @@ def z_score_df(df):
     df = df.apply(lambda x : z_score(x))
     return df
 
-@jit
+
 def make_model(dataset, symbol, side):
     try: 
         t0 = time.time()
