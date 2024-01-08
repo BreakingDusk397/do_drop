@@ -741,11 +741,11 @@ def make_model(dataset, symbol, side):
             #dataset['price_deviation1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
             #dataset['volume_deviation1'] = np.log(dataset['volume1']).rolling(volume_deviation_period).apply(values_deviation)
             dataset['OBV1'+ '_' + str(symbol)] = stats.zscore((np.sign(dataset['Open' + '_' + str(symbol)].diff()) * dataset['Volume' + '_' + str(symbol)]).fillna(0.0000001).cumsum())
-            dataset['ratio'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) / (dataset["Open"])
-            dataset['ratio_reversed'+ '_' + str(symbol)] = (dataset["Open"]) / (dataset["Open" + '_' + str(symbol)])
+            dataset['ratio'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) / (dataset["open"])
+            dataset['ratio_reversed'+ '_' + str(symbol)] = (dataset["open"]) / (dataset["Open" + '_' + str(symbol)])
             dataset['ratio_volu'+ '_' + str(symbol)] = dataset["Open"+ '_' + str(symbol)].pct_change() / dataset["Volume"+ '_' + str(symbol)]
-            dataset['difference'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) - (dataset["Open"])
-            dataset['difference_reversed'+ '_' + str(symbol)] = (dataset["Open"]) - (dataset["Open" + '_' + str(symbol)])
+            dataset['difference'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) - (dataset["open"])
+            dataset['difference_reversed'+ '_' + str(symbol)] = (dataset["open"]) - (dataset["Open" + '_' + str(symbol)])
 
             #dataset['ratio_v'] = (dataset["Volatility"]) / (dataset["Volatility" + '_' + str(symbol)])
             #dataset['ratio_reversed_v'] = (dataset["Volatility" + '_' + str(symbol)]) / (dataset["Volatility"])
