@@ -195,6 +195,7 @@ def get_orderbook(symbol):
 
     symbol = str(symbol)
     previous_df = df_orderbook
+    df_orderbook = previous_df
     try:
         df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
     except:
@@ -697,7 +698,7 @@ def make_model(dataset, symbol, side):
         y_sell = y_sell.dropna(how='any')
         dataset = dataset.drop(['future_return'], axis=1)
 
-        
+        """
 
         dataset['future_return_SPY'] = dataset['open_SPY'].pct_change(future_period).shift(-future_period)
         y_SPY = np.sign(dataset['future_return_SPY'])
@@ -712,26 +713,26 @@ def make_model(dataset, symbol, side):
         y_SPY_sell = y_SPY_sell.dropna(how='any')
 
         dataset = dataset.drop(['future_return_SPY'], axis=1)
-
+        """
  
 
         if str(side) == 'OrderSide.BUY':
             side = OrderSide.BUY
             if symbol == 'NVDA':
                 y = y
-            if symbol == 'SPY':
-                y = y_SPY
+            #if symbol == 'SPY':
+                #y = y_SPY
 
 
         if str(side) == 'OrderSide.SELL':
             side = OrderSide.SELL
             if symbol == 'NVDA':
                 y = y_sell
-            if symbol == 'SPY':
-                y = y_SPY_sell
+            #if symbol == 'SPY':
+                #y = y_SPY_sell
 
 
-        for symbol in ['SPY','NVDA']:
+        """for symbol in ['SPY','NVDA']:
 
             dataset['spread' + '_' + str(symbol)] = dataset['Open' + '_' + str(symbol)] - ((dataset['Low' + '_' + str(symbol)] + dataset['High' + '_' + str(symbol)])/2)
             dataset['spread2' + '_' + str(symbol)] = dataset['High' + '_' + str(symbol)] - dataset['Low' + '_' + str(symbol)]
@@ -754,7 +755,7 @@ def make_model(dataset, symbol, side):
 
             #dataset['difference_v'] = (dataset["Volatility"]) - (dataset["Volatility" + '_' + str(symbol)])
             #dataset['difference_reversed_v'] = (dataset["Volatility" + '_' + str(symbol)]) - (dataset["Volatility"])
-
+        """
 
         dataset['spread'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
@@ -778,14 +779,14 @@ def make_model(dataset, symbol, side):
 
         for i in dataset.columns.tolist():
             detrend(dataset[i], overwrite_data=True)
-        """
+        
         for i in dataset.columns.tolist():
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
-            dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
-            #dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            #dataset[str(i)+'_smooth_10'] = dataset[i].ewm(span=10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            #dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
+            dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            dataset[str(i)+'_smooth_10'] = dataset[i].ewm(span=10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             #dataset[str(i)+'_smooth_20'] = dataset[i].ewm(span=20).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-        """
+        
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -896,7 +897,7 @@ def make_model(dataset, symbol, side):
             
         }
         tscv = TimeSeriesSplit(n_splits=5, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=4, min_resources=2, max_resources=30, cv=tscv, verbose=1, scoring='f1_weighted')
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=4, min_resources=1, max_resources=30, cv=tscv, verbose=1, scoring='f1_weighted')
 
         rscv.fit(dataset[-(len(y)):], y)
 
@@ -986,7 +987,7 @@ async def trade_data_handler(data):
 
     
     take_profit_method(symbol='NVDA')
-    take_profit_method(symbol='SPY')
+    #take_profit_method(symbol='SPY')
     #print('\n Raw Data: \n', data)
     df = pd.DataFrame(data)
 
@@ -1039,7 +1040,7 @@ async def trade_data_handler(data):
 
 
     
-
+    """
 
     if symbol == 'SPY':
             
@@ -1084,7 +1085,7 @@ async def trade_data_handler(data):
         print('\n Time to fetch data: \n', elapsed_time)
         return ask_price_list2
 
-    """
+    
     if symbol == 'AMD':
             
         timestamp3 = df[1][1]
@@ -1156,7 +1157,7 @@ async def create_model(data):
     t = time.process_time()
     
     take_profit_method(symbol='NVDA')
-    take_profit_method(symbol='SPY')
+    #take_profit_method(symbol='SPY')
 
     global data_out
 
@@ -1178,9 +1179,9 @@ async def create_model(data):
     print('\n Time to fetch data: \n', elapsed_time)
 
     dataset = data_out
-    symbol_list = ['NVDA', 'NVDA', 'SPY', 'SPY', ]
-    side_list = ['OrderSide.BUY', 'OrderSide.SELL', 'OrderSide.BUY', 'OrderSide.SELL', ]
-    x_list = [dataset, dataset, dataset, dataset,]
+    symbol_list = ['NVDA', 'NVDA', ]
+    side_list = ['OrderSide.BUY', 'OrderSide.SELL' ]
+    x_list = [dataset, dataset]
 
 
 
@@ -1190,13 +1191,13 @@ async def create_model(data):
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
     take_profit_method(symbol='NVDA')
-    take_profit_method(symbol='SPY')
+    #take_profit_method(symbol='SPY')
     get_time_til_close(symbol='NVDA')
-    get_time_til_close(symbol='SPY')
+    #get_time_til_close(symbol='SPY')
 
 
 
-wss_client.subscribe_trades(create_model, "NVDA", "SPY")
+wss_client.subscribe_trades(create_model, "NVDA")
 
 wss_client.run()
 
