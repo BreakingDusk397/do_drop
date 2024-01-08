@@ -65,7 +65,7 @@ print(datetime.now())
 
 
 
-symbol = "MSFT"
+symbol = "NVDA"
 BASE_URL = "https://paper-api.alpaca.markets"
 API_KEY = "PKBX5XZQ1JG2CEODIOKD"
 SECRET_KEY = "laKd5n4c7pnjRT9nC6WJztVEWruDz2b1VDJab5Hg"
@@ -73,14 +73,27 @@ SECRET_KEY = "laKd5n4c7pnjRT9nC6WJztVEWruDz2b1VDJab5Hg"
 trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
 
 midpoint_TSLA = 0
-midpoint_MSFT = 0
+midpoint_NVDA = 0
 midpoint_AMD = 0
 midpoint = 0
+ask_alpha = 0.01
+bid_alpha = 0.01
+inventory_qty = 1
+best_bid = 0.02
+best_ask = 0.02
+bid_sum_delta_vol = 10000
+ask_sum_delta_vol = 10000
 
 def get_orderbook(symbol):
 
+    t = time.process_time()
+
+    
+    take_profit_method(symbol)
+    
+    
     global midpoint_TSLA
-    global midpoint_MSFT
+    global midpoint_NVDA
     global midpoint_AMD
 
     try:
@@ -149,7 +162,7 @@ def get_orderbook(symbol):
         bid_alpha = 0.01
         print(traceback.format_exc())
         
-    inventory_qty = 1
+    
     try:
         symbol = symbol
         trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
@@ -176,43 +189,26 @@ def get_orderbook(symbol):
         
 
     symbol = str(symbol)
-    
-    df = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
-    """
-    df['highest'] = df['High'].cummax() #take the cumulative max
-    df['lowest'] = df['Low'].cummax() #take the cumulative max
-    df['buy_trailingstop'] = df['highest']*0.9995 #subtract 1% of the max
-    df['sell_trailingstop'] = df['lowest']*1.0005 #add 1% of the max
+    try:
+        df = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
+    except:
+        pass
 
-    if side == 'PositionSide.LONG':
-        if avg_entry_price > df['buy_trailingstop'][-1]:
-            cancel_orders_for_symbol(symbol=symbol)
-            trading_client.close_position(symbol)
-            print("\n buy trailing stop sleep \n")
-            #time.sleep(1)
-
-    if side == 'PositionSide.SHORT':
-        if avg_entry_price < df['sell_trailingstop'][-1]:
-            cancel_orders_for_symbol(symbol=symbol)
-            trading_client.close_position(symbol)
-            print("\n sell trailing stop sleep \n")
-            #time.sleep(1)
-    """
     df['inventory'] = inventory_qty
     #df = df.iloc[::-1]
-    df["mu"] = abs((np.log(df["Open"].ewm(span=5).mean()).pct_change()/2) * 10000)
+    df["mu"] = abs((np.log(df["Open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
     #print('mu: ', df["mu"][:-1])
 
     df['gamma'] = get_inventory_risk(symbol = symbol)
     #print('gamma: ', df["gamma"][:-1])
 
-    df['sigma'] = ((np.log(df["Open"]).ewm(span=5).std() * np.sqrt(5)).ewm(span=5).mean()) * 100
+    df['sigma'] = ((np.log(df["Open"]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) * 100
     #print('sigma: ', df["sigma"][:-1])
 
     df['Volume'] = df['Volume'] + 1
 
 
-    df['k'] = (0.5*(df['sigma'])*np.sqrt(df['Volume']/df['Volume'].ewm(span=5).mean()))*1
+    df['k'] = (0.5*(df['sigma'])*np.sqrt(df['Volume']/df['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))*1
     #print('k: ', df["k"][:-1])
     #(df['k'] / 2 * df['sigma'] * df['gamma']**2) * 100000
     df['bid_alpha'] = bid_alpha
@@ -235,15 +231,15 @@ def get_orderbook(symbol):
 
     #print(df['bid_spread_aysm'][-1])
     #print(df['ask_spread_aysm'][-1])
-    print("\n bid: \n", df['bid_spread_aysm2'][-1])
-    print("\n ask: \n", df['ask_spread_aysm2'][-1])
+    print("\n bid: \n", symbol, df['bid_spread_aysm2'][-1])
+    print("\n ask: \n", symbol, df['ask_spread_aysm2'][-1])
 
     best_ask = df['ask_spread_aysm2'][-1]
     best_bid = df['bid_spread_aysm2'][-1]
 
-    if symbol == 'MSFT':
-        midpoint_MSFT = midpoint
-        df['midpoint_MSFT'] = midpoint
+    if symbol == 'NVDA':
+        midpoint_NVDA = midpoint
+        df['midpoint_NVDA'] = midpoint
 
     if symbol == 'TSLA':
         midpoint_TSLA = midpoint
@@ -252,6 +248,9 @@ def get_orderbook(symbol):
     if symbol == 'AMD':
         midpoint_AMD = midpoint
         df['midpoint_AMD'] = midpoint
+
+    elapsed_time = time.process_time() - t
+    print('\n Time to ordebook method: \n', elapsed_time)
 
     return best_bid, best_ask, midpoint, df, inventory_qty
 
@@ -272,7 +271,7 @@ def get_time_til_close(symbol):
             if int(now.minute) > 57:
                 cancel_orders_for_symbol(symbol=symbol)
                 trading_client.close_position(symbol)
-                time.sleep(1)
+                
     except:
         print("get_time_til_close exception. It's not trading time...")
         #print(traceback.format_exc())
@@ -289,7 +288,7 @@ def get_inventory_risk(symbol):
         ORDERS = pd.DataFrame(position)
         inventory_qty = int(ORDERS[1][6])
 
-        if symbol == "MSFT":
+        if symbol == "NVDA":
             inventory_risk = 0.000002 * abs(inventory_qty)
 
         if symbol == 'TSLA':
@@ -339,27 +338,27 @@ def take_profit_method(symbol):
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.05:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
             cancel_orders_for_symbol(symbol=symbol)
-            time.sleep(1)
+            
             trading_client.close_position(symbol)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.04:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.8:
             cancel_orders_for_symbol(symbol=symbol)
-            time.sleep(1)
+            
             trading_client.close_position(symbol)
         
-        if float(ORDERS[1][12]) >=  4:
+        if float(ORDERS[1][12]) >=  5:
             
             cancel_orders_for_symbol(symbol=symbol)
-            time.sleep(1)
+            
             trading_client.close_position(symbol)
             
 
-        elif float(ORDERS[1][12]) <=  -5:
+        elif float(ORDERS[1][12]) <=  -8:
 
             cancel_orders_for_symbol(symbol=symbol)
-            time.sleep(1)
+            
             trading_client.close_position(symbol)
             
 
@@ -367,13 +366,13 @@ def take_profit_method(symbol):
 
             if float(ORDERS[1][5]) - float(ORDERS[1][14]) <= -0.1:
                 cancel_orders_for_symbol(symbol=symbol)
-                time.sleep(1)
+                
                 trading_client.close_position(symbol)
                 
 
             if float(ORDERS[1][5]) - float(ORDERS[1][14]) >= 0.1:
                 cancel_orders_for_symbol(symbol=symbol)
-                time.sleep(1)
+                
                 trading_client.close_position(symbol)
                 
 
@@ -382,13 +381,13 @@ def take_profit_method(symbol):
 
             if float(ORDERS[1][5]) - float(ORDERS[1][14]) >= 0.1:
                 cancel_orders_for_symbol(symbol=symbol)
-                time.sleep(1)
+                
                 trading_client.close_position(symbol)
                 
 
             if float(ORDERS[1][5]) - float(ORDERS[1][14]) <= -0.1:
                 cancel_orders_for_symbol(symbol=symbol)
-                time.sleep(1)
+                
                 trading_client.close_position(symbol)
                 
 
@@ -411,8 +410,8 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     dataset = df
 
 
-    dataset['spread'] = abs(np.log(dataset['Open']).ewm(span=5).mean() - ((np.log(dataset['Low']).ewm(span=5).mean() + np.log(dataset['High']).ewm(span=5).mean())/2))
-    dataset['variance'] = (np.log(dataset['Open']).ewm(span=5).std() * np.sqrt(5)).ewm(span=5).mean()
+    dataset['spread'] = abs(np.log(dataset['Open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - ((np.log(dataset['Low']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + np.log(dataset['High']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/2))
+    dataset['variance'] = (np.log(dataset['Open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
     current_variance = (dataset["variance"][-1])
     current_spread = (dataset["spread"][-1])
     current_variance = float(current_variance) * 1000
@@ -432,8 +431,8 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     #steps_in_day = 100
     #mid_price = float(current_price)
 
-    if symbol == 'MSFT':
-        midpoint = midpoint_MSFT
+    if symbol == 'NVDA':
+        midpoint = midpoint_NVDA
 
     if symbol == 'TSLA':
         midpoint = midpoint_TSLA
@@ -577,8 +576,7 @@ def match_orders_for_symbol(symbol):
         side = str(ORDERS[1][7])
         qty = float(ORDERS[1][20])
         best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
-        best_bid = best_bid / 2.0
-        best_ask = best_ask / 2.0
+
 
         if str(side) == 'PositionSide.SHORT':
 
@@ -630,24 +628,24 @@ def metric(y_true, y_pred):
     plt.show()"""
 
 
-@jit
+@jit(cache=True, nopython=True)
 def std_normalized(vals):
     return np.std(vals) / np.mean(vals)
 
 # Ratio of diff between last price and mean value to last price
-@jit
+@jit(cache=True, nopython=True)
 def ma_ratio(vals):
     return (vals[-1] - np.mean(vals)) / vals[-1]
 
 # z-score for volumes and price
-@jit
+@jit(cache=True, nopython=True)
 def values_deviation(vals):
     return (vals[-1] - np.mean(vals)) / np.std(vals)
 
-@jit
+@jit(cache=True)
 def z_score(vals):
     vals = np.log(vals)
-    vals = ((vals - vals.expanding().mean())/vals.expanding().std()).pct_change()
+    vals = ((vals - vals.expanding().mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/vals.expanding().std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()
     return vals
 
 
@@ -663,7 +661,7 @@ def make_model(dataset, symbol, side):
         symbol = str(symbol)
         get_time_til_close(symbol=symbol)
         take_profit_method(symbol=symbol)
-        match_orders_for_symbol(symbol=symbol)
+
 
 
         column_price = 'open'
@@ -683,10 +681,7 @@ def make_model(dataset, symbol, side):
         ma_period = 15
         price_deviation_period = 15
         volume_deviation_period = 15
-        #dataset['volume'] = dataset['volume']/1000
-        #print('dataset: ', dataset)
-        #dataset = dataset[-400:]
-        dataset_TSLA = dataset
+
 
         
         dataset['future_return'] = dataset['open'].pct_change(future_period).shift(-future_period)
@@ -720,7 +715,7 @@ def make_model(dataset, symbol, side):
 
         if str(side) == 'OrderSide.BUY':
             side = OrderSide.BUY
-            if symbol == 'MSFT':
+            if symbol == 'NVDA':
                 y = y
             if symbol == 'TSLA':
                 y = y_TSLA
@@ -728,7 +723,7 @@ def make_model(dataset, symbol, side):
 
         if str(side) == 'OrderSide.SELL':
             side = OrderSide.SELL
-            if symbol == 'MSFT':
+            if symbol == 'NVDA':
                 y = y_sell
             if symbol == 'TSLA':
                 y = y_TSLA_sell
@@ -738,14 +733,14 @@ def make_model(dataset, symbol, side):
 
             dataset['spread' + '_' + str(symbol)] = dataset['open' + '_' + str(symbol)] - ((dataset['low' + '_' + str(symbol)] + dataset['high' + '_' + str(symbol)])/2)
             dataset['spread2' + '_' + str(symbol)] = dataset['high' + '_' + str(symbol)] - dataset['low' + '_' + str(symbol)]
-            dataset['Volatility' + '_' + str(symbol)] = (np.log(dataset['open' + '_' + str(symbol)]).ewm(span=5).std() * np.sqrt(5))
-            dataset['Volatility2' + '_' + str(symbol)] = (np.log(dataset['Volatility' + '_' + str(symbol)]).ewm(span=5).std() * np.sqrt(5))
+            dataset['Volatility' + '_' + str(symbol)] = (np.log(dataset['open' + '_' + str(symbol)]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
+            dataset['Volatility2' + '_' + str(symbol)] = (np.log(dataset['Volatility' + '_' + str(symbol)]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
             dataset['last_return1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).pct_change()
-            dataset['std_normalized1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(std_period).apply(std_normalized)
-            dataset['ma_ratio1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(ma_period).apply(ma_ratio)
-            dataset['price_deviation1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(price_deviation_period).apply(values_deviation)
+            dataset['std_normalized1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+            dataset['ma_ratio1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(ma_period).apply(ma_ratio, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+            #dataset['price_deviation1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
             #dataset['volume_deviation1'] = np.log(dataset['volume1']).rolling(volume_deviation_period).apply(values_deviation)
-            dataset['OBV1'+ '_' + str(symbol)] = stats.zscore((np.sign(dataset['open' + '_' + str(symbol)].diff()) * dataset['volume' + '_' + str(symbol)]).fillna(0).cumsum())
+            dataset['OBV1'+ '_' + str(symbol)] = stats.zscore((np.sign(dataset['open' + '_' + str(symbol)].diff()) * dataset['volume' + '_' + str(symbol)]).fillna(0.0000001).cumsum())
             dataset['ratio'+ '_' + str(symbol)] = (dataset["open" + '_' + str(symbol)]) / (dataset["open"])
             dataset['ratio_reversed'+ '_' + str(symbol)] = (dataset["open"]) / (dataset["open" + '_' + str(symbol)])
             dataset['ratio_volu'+ '_' + str(symbol)] = dataset["open"].pct_change() / dataset["volume"]
@@ -761,36 +756,37 @@ def make_model(dataset, symbol, side):
 
         dataset['spread'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
-        dataset['Volatility'] = (np.log(dataset['open']).ewm(span=5).std() * np.sqrt(5))
-        dataset['Volatility2'] = (np.log(dataset['Volatility']).ewm(span=5).std() * np.sqrt(5))
+        dataset['Volatility'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
+        dataset['Volatility2'] = (np.log(dataset['Volatility']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
         #
 
         
         dataset['last_return'] = np.log(dataset["open"]).pct_change()
-        dataset['std_normalized'] = np.log(dataset[column_price]).rolling(std_period).apply(std_normalized)
-        dataset['ma_ratio'] = np.log(dataset[column_price]).rolling(ma_period).apply(ma_ratio)
-        dataset['price_deviation'] = np.log(dataset[column_price]).rolling(price_deviation_period).apply(values_deviation)
+        dataset['std_normalized'] = np.log(dataset[column_price]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['ma_ratio'] = np.log(dataset[column_price]).rolling(ma_period).apply(ma_ratio, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+        #dataset['price_deviation'] = np.log(dataset[column_price]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
         #dataset['volume_deviation'] = np.log(dataset[column_volume]).rolling(volume_deviation_period).apply(values_deviation)
-        dataset['OBV'] = stats.zscore((np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0).cumsum())
+        dataset['OBV'] = stats.zscore((np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum())
 
         
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0)
-        sos = butter(4, 0.125, output='sos')
+        dataset = dataset.fillna(0.0000001)
+        #sos = butter(4, 0.125, output='sos')
 
         for i in dataset.columns.tolist():
             detrend(dataset[i], overwrite_data=True)
-
+        """
         for i in dataset.columns.tolist():
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
             dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
-            #dataset[str(i)+'_smooth_5'] = dataset[i].ewm(span=5).mean()
-            #dataset[str(i)+'_smooth_10'] = dataset[i].ewm(span=10).mean()
-            #dataset[str(i)+'_smooth_20'] = dataset[i].ewm(span=20).mean()
+            #dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            #dataset[str(i)+'_smooth_10'] = dataset[i].ewm(span=10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            #dataset[str(i)+'_smooth_20'] = dataset[i].ewm(span=20).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        """
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0)
+        dataset = dataset.fillna(0.0000001)
         
 
         #print('dataset: \n', dataset)
@@ -798,19 +794,19 @@ def make_model(dataset, symbol, side):
         dataset = z_score_df(dataset)
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         
-        dataset = dataset.fillna(0)
+        dataset = dataset.fillna(0.0000001)
         #print('\n after z_score percent dataset: \n', dataset)
         #print('\n after z_score percent dataset: \n', dataset.describe())
         index1 = dataset.index
         columns_list = dataset.columns.tolist()
-        dataset = winsorize(dataset.values, limits=[0.02, 0.02], inplace=True, nan_policy='propagate')
+        dataset = winsorize(dataset.values, limits=[0.05, 0.05], inplace=True, nan_policy='propagate')
         dataset = pd.DataFrame(dataset, columns=columns_list, index=index1)
         #print('\n after winsorize dataset: \n', dataset)
         print('\n after winsorize dataset: \n', dataset.describe())
         #dataset = dataset.dropna(how="all", axis=1)
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         #dataset = dataset.dropna(how='any')
-        dataset = dataset.fillna(0)
+        dataset = dataset.fillna(0.0000001)
 
 
         last_input = dataset[-2:]
@@ -825,14 +821,14 @@ def make_model(dataset, symbol, side):
 
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0)
+        dataset = dataset.fillna(0.0000001)
 
         
 
         y = y.dropna()
 
-        #dataset = dataset.apply(pd.to_numeric, downcast='float')
-        #dataset = dataset.apply(pd.to_numeric, downcast='integer')
+        dataset = dataset.apply(pd.to_numeric, downcast='float')
+        dataset = dataset.apply(pd.to_numeric, downcast='integer')
 
 
 
@@ -871,11 +867,11 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=test_dataset, features_for_select=list(dataset.columns), num_features_to_select=10, steps=5, algorithm='RecursiveByShapValues', train_final_model=True, verbose=False)
+        selected_features = catboost_class.select_features(train_dataset, eval_set=test_dataset, features_for_select=list(dataset.columns), num_features_to_select=10, steps=5, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, verbose=False)
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
-
+        take_profit_method(symbol)
 
 
         grid = {
@@ -928,10 +924,15 @@ def make_model(dataset, symbol, side):
 
         if int(CatBoost_pred) == 1:
 
+            if str(side) == 'OrderSide.BUY':
+                spread = -0.02
 
+
+            if str(side) == 'OrderSide.SELL':
+                spread = 0.02
 
                 limit_order(symbol=symbol, 
-                            spread=0, 
+                            spread=spread, 
                             side=side, 
                             take_profit_multiplier = 2,
                             loss_stop_multiplier = 2,
@@ -940,8 +941,8 @@ def make_model(dataset, symbol, side):
                             inventory_risk = get_inventory_risk(symbol=symbol)
                             )
                 
-
-        match_orders_for_symbol(symbol=symbol)
+        take_profit_method(symbol)
+        #match_orders_for_symbol(symbol=symbol)
         t1 = time.time()
         total = t1-t0
         print('\n Total time to order: \n', total)
@@ -967,54 +968,59 @@ ask_price_list_AMD5 = pd.DataFrame()
 # async handler
 async def trade_data_handler(data):
     # quote data will arrive here
+    t = time.process_time()
+
     
+    take_profit_method(symbol='NVDA')
+    take_profit_method(symbol='TSLA')
     #print('\n Raw Data: \n', data)
     df = pd.DataFrame(data)
 
     symbol = df[1][0]
 
 
-    if symbol == "MSFT":
+    if symbol == "NVDA":
         timestamp = df[1][1]
         ask_price = df[1][3]
         volume = df[1][4]
         global ask_price_list
         global ask_price_list3
-        best_bid_MSFT, best_ask_MSFT, midpoint_MSFT, df1, inventory_qty_MSFT = get_orderbook("MSFT")
+        best_bid_NVDA, best_ask_NVDA, midpoint_NVDA, df1, inventory_qty_NVDA = get_orderbook("NVDA")
 
-        d = {'close':[ask_price],'volume':[volume], 'Open':float(df1['Open'][-1]), 'High':[df1['High'][-1]], 'Low':[df1['Low'][-1]], 'Close':[df1['Close'][-1]], 
+        d = {'close':[ask_price],'volume':[volume], 'Open':float(df1['Open'][-1]), 'High':[df1['High'][-1]],
+                'Low':[df1['Low'][-1]], 'Close':[df1['Close'][-1]], 
                 'Volume':[df1['Volume'][-1]],
-                'mu_MSFT':[df1['mu'][-1]], 'gamma_MSFT':[df1['gamma'][-1]], 'sigma_MSFT':[df1['sigma'][-1]], 'k_MSFT':[df1['k'][-1]],
-                'bid_alpha_MSFT':[df1['bid_alpha'][-1]], 'ask_alpha_MSFT':[df1['ask_alpha'][-1]], 'ask_sum_delta_vol_MSFT':[df1['ask_sum_delta_vol'][-1]], 
-                'bid_sum_delta_vol_MSFT':[df1['bid_sum_delta_vol'][-1]], 
-                'bid_spread_aysm_MSFT':[df1['bid_spread_aysm'][-1]], 
-                'ask_spread_aysm_MSFT':[df1['ask_spread_aysm'][-1]], 
-                'inventory_MSFT':[df1['inventory'][-1]],
-                'bid_spread_aysm2_MSFT':[df1['bid_spread_aysm2'][-1]], 
-                'ask_spread_aysm2_MSFT':[df1['ask_spread_aysm2'][-1]],
-                'midpoint_MSFT':[midpoint_MSFT],
-                'inventory_qty_MSFT':[inventory_qty_MSFT], 
-                'best_bid_MSFT':[best_bid_MSFT], 'best_ask_MSFT':[best_ask_MSFT],
+                'mu_NVDA':[df1['mu'][-1]], 'gamma_NVDA':[df1['gamma'][-1]], 'sigma_NVDA':[df1['sigma'][-1]], 'k_NVDA':[df1['k'][-1]],
+                'bid_alpha_NVDA':[df1['bid_alpha'][-1]], 'ask_alpha_NVDA':[df1['ask_alpha'][-1]],
+                'ask_sum_delta_vol_NVDA':[df1['ask_sum_delta_vol'][-1]], 
+                'bid_sum_delta_vol_NVDA':[df1['bid_sum_delta_vol'][-1]], 
+                'inventory_NVDA':[df1['inventory'][-1]],
+                'bid_spread_aysm2_NVDA':[df1['bid_spread_aysm2'][-1]], 
+                'ask_spread_aysm2_NVDA':[df1['ask_spread_aysm2'][-1]],
+                'midpoint_NVDA':[midpoint_NVDA],
+                'best_bid_NVDA':[best_bid_NVDA], 'best_ask_NVDA':[best_ask_NVDA],
                 }
         
         row = pd.DataFrame(d, index = [timestamp])
         #print('\n row: \n', row)
         
         ask_price_list = pd.concat([ask_price_list, row])
-        volume = ask_price_list['volume'].resample('10S').sum()
+        volume = ask_price_list['volume'].resample('20S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('10S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('20S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
-        for i in ['Open', 'High','Low','Close', 'Volume', 'best_bid_MSFT', 'best_ask_MSFT', 'midpoint_MSFT', 'inventory_qty_MSFT' ,'mu_MSFT','gamma_MSFT','sigma_MSFT','k_MSFT', 'bid_alpha_MSFT', 'ask_alpha_MSFT', 'ask_sum_delta_vol_MSFT', 'bid_sum_delta_vol_MSFT', 'bid_spread_aysm_MSFT', 'ask_spread_aysm_MSFT', 'bid_spread_aysm2_MSFT', 'ask_spread_aysm2_MSFT',]:
-            ask_price_list_temp = ask_price_list[i].resample('10S').mean()
+        for i in ['Open', 'High','Low','Close', 'Volume', 'best_bid_NVDA', 'inventory_NVDA', 'best_ask_NVDA', 'midpoint_NVDA', 'mu_NVDA','gamma_NVDA','sigma_NVDA','k_NVDA', 'bid_alpha_NVDA', 'ask_alpha_NVDA', 'ask_sum_delta_vol_NVDA', 'bid_sum_delta_vol_NVDA', 'bid_spread_aysm2_NVDA', 'ask_spread_aysm2_NVDA',]:
+            ask_price_list_temp = ask_price_list[i].resample('20S').mean()
             ask_price_list3 = pd.merge(left=ask_price_list3, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
 
         ask_price_list3 = ask_price_list3.ffill()
 
 
-        #print('\n ask_price_list_MSFT: \n', ask_price_list3)
+        #print('\n ask_price_list_NVDA: \n', ask_price_list3)
+        elapsed_time = time.process_time() - t
+        print('\n Time to fetch data: \n', elapsed_time)
         return ask_price_list3
 
 
@@ -1032,13 +1038,11 @@ async def trade_data_handler(data):
         best_bid_TSLA, best_ask_TSLA, midpoint_TSLA, df2, inventory_qty_TSLA = get_orderbook("TSLA")
 
         d2 = {'close':[ask_price2],'volume':[volume2], 'Open_TSLA':[df2['Open'][-1]], 'High_TSLA':[df2['High'][-1]], 'Low_TSLA':[df2['Low'][-1]],
-                'Close_TSLA':[df2['Close'][-1]],'midpoint_TSLA':[midpoint_TSLA], 'inventory_qty_TSLA':[inventory_qty_TSLA], 
+                'Close_TSLA':[df2['Close'][-1]],'midpoint_TSLA':[midpoint_TSLA],
                 'best_bid_TSLA':[best_bid_TSLA], 'best_ask_TSLA':[best_ask_TSLA],
                 'mu_TSLA':[df2['mu'][-1]], 'gamma_TSLA':[df2['gamma'][-1]], 'sigma_TSLA':[df2['sigma'][-1]], 'k_TSLA':[df2['k'][-1]],
                 'bid_alpha_TSLA':[df2['bid_alpha'][-1]], 'ask_alpha_TSLA':[df2['ask_alpha'][-1]], 'ask_sum_delta_vol_TSLA':[df2['ask_sum_delta_vol'][-1]], 
                 'bid_sum_delta_vol_TSLA':[df2['bid_sum_delta_vol'][-1]], 
-                'bid_spread_aysm_TSLA':[df2['bid_spread_aysm'][-1]], 
-                'ask_spread_aysm_TSLA':[df2['ask_spread_aysm'][-1]], 
                 'inventory_TSLA':[df2['inventory'][-1]],
                 'bid_spread_aysm2_TSLA':[df2['bid_spread_aysm2'][-1]], 
                 'ask_spread_aysm2_TSLA':[df2['ask_spread_aysm2'][-1]], }
@@ -1046,15 +1050,15 @@ async def trade_data_handler(data):
         row2 = pd.DataFrame(d2, index = [timestamp2])
                 
         ask_price_list5 = pd.concat([ask_price_list5, row2])
-        volume2 = ask_price_list5['volume'].resample('10S').sum()
+        volume2 = ask_price_list5['volume'].resample('20S').sum()
 
 
-        ask_price_list2 = ask_price_list5['close'].resample('10S').ohlc()
+        ask_price_list2 = ask_price_list5['close'].resample('20S').ohlc()
         ask_price_list2 = pd.merge(left=ask_price_list2, right=volume2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
 
-        for i in ['Open_TSLA', 'High_TSLA','Low_TSLA','Close_TSLA', 'midpoint_TSLA', 'inventory_qty_TSLA', 'best_bid_TSLA', 'best_ask_TSLA','mu_TSLA','gamma_TSLA','sigma_TSLA','k_TSLA', 'bid_alpha_TSLA', 'ask_alpha_TSLA', 'ask_sum_delta_vol_TSLA', 'bid_sum_delta_vol_TSLA', 'bid_spread_aysm_TSLA', 'ask_spread_aysm_TSLA', 'bid_spread_aysm2_TSLA', 'ask_spread_aysm2_TSLA',]:
-            ask_price_list_temp = ask_price_list5[i].resample('10S').mean()
+        for i in ['Open_TSLA', 'High_TSLA','Low_TSLA','Close_TSLA', 'midpoint_TSLA', 'best_bid_TSLA','inventory_TSLA', 'best_ask_TSLA','mu_TSLA','gamma_TSLA','sigma_TSLA','k_TSLA', 'bid_alpha_TSLA', 'ask_alpha_TSLA', 'ask_sum_delta_vol_TSLA', 'bid_sum_delta_vol_TSLA', 'bid_spread_aysm2_TSLA', 'ask_spread_aysm2_TSLA',]:
+            ask_price_list_temp = ask_price_list5[i].resample('20S').mean()
             ask_price_list2 = pd.merge(left=ask_price_list2, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
         
@@ -1062,6 +1066,8 @@ async def trade_data_handler(data):
         ask_price_list2 = ask_price_list2.rename(columns={"open":"open_TSLA", "high":"high_TSLA", "low":"low_TSLA", "close":"close_TSLA", "volume":"volume_TSLA"})
 
         #print('\n ask_price_list_TSLA: \n', ask_price_list2)
+        elapsed_time = time.process_time() - t
+        print('\n Time to fetch data: \n', elapsed_time)
         return ask_price_list2
 
     """
@@ -1089,15 +1095,15 @@ async def trade_data_handler(data):
         row2_AMD = pd.DataFrame(d2_AMD, index = [timestamp3])
                 
         ask_price_list_AMD5 = pd.concat([ask_price_list_AMD5, row2_AMD])
-        volume_AMD2 = ask_price_list_AMD5['volume'].resample('10S').sum()
+        volume_AMD2 = ask_price_list_AMD5['volume'].resample('20S').sum()
 
 
-        ask_price_list_AMD2 = ask_price_list_AMD5['close'].resample('10S').ohlc()
+        ask_price_list_AMD2 = ask_price_list_AMD5['close'].resample('20S').ohlc()
         ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=volume_AMD2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
 
         for i in ['Open_AMD', 'High_AMD','Low_AMD','Close_AMD','best_bid_AMD', 'best_ask_AMD', 'midpoint_AMD', 'inventory_qty_AMD', 'best_bid_AMD', 'best_ask_AMD','mu_AMD','gamma_AMD','sigma_AMD','k_AMD', 'bid_alpha_AMD', 'ask_alpha_AMD', 'ask_sum_delta_vol_AMD', 'bid_sum_delta_vol_AMD', 'bid_spread_aysm_AMD', 'ask_spread_aysm_AMD', 'bid_spread_aysm2_AMD', 'ask_spread_aysm2_AMD',]:
-            ask_price_list_temp_AMD = ask_price_list_AMD5[i].resample('10S').mean()
+            ask_price_list_temp_AMD = ask_price_list_AMD5[i].resample('20S').mean()
             ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=ask_price_list_temp_AMD, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
         
@@ -1134,33 +1140,23 @@ data_out = pd.DataFrame()
 async def create_model(data):
 
     t = time.process_time()
+    
+    take_profit_method(symbol='NVDA')
+    take_profit_method(symbol='TSLA')
 
     global data_out
 
     data_in = await trade_data_handler(data)
 
-    #data_out = data_in.join(data_out)
-    #data_out = data_out.append(data_in[~data_in.index.isin(data_out.index)])
-    #print('\n data_in: \n', data_in)
-    #data_out = pd.concat([data_out, data_in], axis=1)
-    #print('\n data_out concat: \n', data_out)
+
     data_out = pd.merge(left=data_in, right=data_out, left_index=True, right_index=True, how='outer', suffixes=('', '_y'))
-    #print('\n data_out merge: \n', data_out)
+
     data_out.drop(data_out.filter(regex='_y$').columns, axis=1, inplace=True)
 
-    #if data_in[-1:].index > data_out[-1:].index:
-        #data_out = pd.concat([data_out, data_in[-1:]])
-
-    #data_out = data_out.drop_duplicates()
-    
-
-    
-
-    #data_out2 = pd.merge(left=data_in, right=data_out, left_index=True, right_index=True,how='left')
 
     
     data_out = data_out.ffill()
-    data_out = data_out.fillna(0)
+    data_out = data_out.fillna(0.0000001)
     #print('\n latest merged df: \n', data_out)
     #print('\n latest data recieved: \n', data_out[-1:])
 
@@ -1168,10 +1164,9 @@ async def create_model(data):
     print('\n Time to fetch data: \n', elapsed_time)
 
     dataset = data_out
-    symbol_list = ['MSFT', 'MSFT', 'TSLA', 'TSLA', ]
+    symbol_list = ['NVDA', 'NVDA', 'TSLA', 'TSLA', ]
     side_list = ['OrderSide.BUY', 'OrderSide.SELL', 'OrderSide.BUY', 'OrderSide.SELL', ]
     x_list = [dataset, dataset, dataset, dataset,]
-    #y_list = [y, y_sell, y, y_sell]
 
 
 
@@ -1180,10 +1175,14 @@ async def create_model(data):
 
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
+    take_profit_method(symbol='NVDA')
+    take_profit_method(symbol='TSLA')
+    get_time_til_close(symbol='NVDA')
+    get_time_til_close(symbol='TSLA')
 
 
 
-wss_client.subscribe_trades(create_model, "MSFT", "TSLA")
+wss_client.subscribe_trades(create_model, "NVDA", "TSLA")
 
 wss_client.run()
 
