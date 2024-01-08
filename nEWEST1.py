@@ -83,6 +83,8 @@ best_bid = 0.02
 best_ask = 0.02
 bid_sum_delta_vol = 10000
 ask_sum_delta_vol = 10000
+previous_df = 0
+
 
 def get_orderbook(symbol):
 
@@ -95,6 +97,7 @@ def get_orderbook(symbol):
     global midpoint_TSLA
     global midpoint_NVDA
     global midpoint_AMD
+    global previous_df
 
     try:
         symbol = symbol
@@ -189,10 +192,11 @@ def get_orderbook(symbol):
         
 
     symbol = str(symbol)
+    previous_df = df
     try:
         df = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
     except:
-        pass
+        df = previous_df
 
     df['inventory'] = inventory_qty
     #df = df.iloc[::-1]
@@ -241,7 +245,7 @@ def get_orderbook(symbol):
         midpoint_NVDA = midpoint
         df['midpoint_NVDA'] = midpoint
 
-    if symbol == 'TSLA':
+    if symbol == 'SPY':
         midpoint_TSLA = midpoint
         df['midpoint_TSLA'] = midpoint
 
@@ -291,7 +295,7 @@ def get_inventory_risk(symbol):
         if symbol == "NVDA":
             inventory_risk = 0.000002 * abs(inventory_qty)
 
-        if symbol == 'TSLA':
+        if symbol == 'SPY':
             inventory_risk = 0.00002 * abs(inventory_qty)
 
     except:
@@ -434,7 +438,7 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     if symbol == 'NVDA':
         midpoint = midpoint_NVDA
 
-    if symbol == 'TSLA':
+    if symbol == 'SPY':
         midpoint = midpoint_TSLA
 
     if symbol == 'AMD':
@@ -717,7 +721,7 @@ def make_model(dataset, symbol, side):
             side = OrderSide.BUY
             if symbol == 'NVDA':
                 y = y
-            if symbol == 'TSLA':
+            if symbol == 'SPY':
                 y = y_TSLA
 
 
@@ -725,11 +729,11 @@ def make_model(dataset, symbol, side):
             side = OrderSide.SELL
             if symbol == 'NVDA':
                 y = y_sell
-            if symbol == 'TSLA':
+            if symbol == 'SPY':
                 y = y_TSLA_sell
 
 
-        for symbol in ['TSLA','NVDA']:
+        for symbol in ['SPY','NVDA']:
 
             dataset['spread' + '_' + str(symbol)] = dataset['Open' + '_' + str(symbol)] - ((dataset['Low' + '_' + str(symbol)] + dataset['High' + '_' + str(symbol)])/2)
             dataset['spread2' + '_' + str(symbol)] = dataset['High' + '_' + str(symbol)] - dataset['Low' + '_' + str(symbol)]
@@ -974,7 +978,7 @@ async def trade_data_handler(data):
 
     
     take_profit_method(symbol='NVDA')
-    take_profit_method(symbol='TSLA')
+    take_profit_method(symbol='SPY')
     #print('\n Raw Data: \n', data)
     df = pd.DataFrame(data)
 
@@ -1007,13 +1011,13 @@ async def trade_data_handler(data):
         #print('\n row: \n', row)
         
         ask_price_list = pd.concat([ask_price_list, row])
-        volume = ask_price_list['volume'].resample('30S').sum()
+        volume = ask_price_list['volume'].resample('10S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('30S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('10S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
         for i in ['Open_NVDA', 'High_NVDA','Low_NVDA','Close_NVDA', 'Volume_NVDA', 'best_bid_NVDA', 'inventory_NVDA', 'best_ask_NVDA', 'midpoint_NVDA', 'mu_NVDA','gamma_NVDA','sigma_NVDA','k_NVDA', 'bid_alpha_NVDA', 'ask_alpha_NVDA', 'ask_sum_delta_vol_NVDA', 'bid_sum_delta_vol_NVDA', 'bid_spread_aysm2_NVDA', 'ask_spread_aysm2_NVDA',]:
-            ask_price_list_temp = ask_price_list[i].resample('30S').mean()
+            ask_price_list_temp = ask_price_list[i].resample('10S').mean()
             ask_price_list3 = pd.merge(left=ask_price_list3, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
 
@@ -1029,7 +1033,7 @@ async def trade_data_handler(data):
     
 
 
-    if symbol == 'TSLA':
+    if symbol == 'SPY':
             
         timestamp2 = df[1][1]
         ask_price2 = df[1][3]
@@ -1037,7 +1041,7 @@ async def trade_data_handler(data):
         global ask_price_list5
         global ask_price_list2
 
-        best_bid_TSLA, best_ask_TSLA, midpoint_TSLA, df2, inventory_qty_TSLA = get_orderbook("TSLA")
+        best_bid_TSLA, best_ask_TSLA, midpoint_TSLA, df2, inventory_qty_TSLA = get_orderbook("SPY")
 
         d2 = {'close':[ask_price2],'volume':[volume2], 'Open_TSLA':[df2['Open'][-1]], 'High_TSLA':[df2['High'][-1]], 'Low_TSLA':[df2['Low'][-1]],
                 'Close_TSLA':[df2['Close'][-1]],'midpoint_TSLA':[midpoint_TSLA],'Volume_TSLA':[df2['Volume'][-1]],
@@ -1052,15 +1056,15 @@ async def trade_data_handler(data):
         row2 = pd.DataFrame(d2, index = [timestamp2])
                 
         ask_price_list5 = pd.concat([ask_price_list5, row2])
-        volume2 = ask_price_list5['volume'].resample('30S').sum()
+        volume2 = ask_price_list5['volume'].resample('10S').sum()
 
 
-        ask_price_list2 = ask_price_list5['close'].resample('30S').ohlc()
+        ask_price_list2 = ask_price_list5['close'].resample('10S').ohlc()
         ask_price_list2 = pd.merge(left=ask_price_list2, right=volume2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
 
         for i in ['Open_TSLA', 'High_TSLA','Low_TSLA','Close_TSLA', 'Volume_TSLA', 'midpoint_TSLA', 'best_bid_TSLA','inventory_TSLA', 'best_ask_TSLA','mu_TSLA','gamma_TSLA','sigma_TSLA','k_TSLA', 'bid_alpha_TSLA', 'ask_alpha_TSLA', 'ask_sum_delta_vol_TSLA', 'bid_sum_delta_vol_TSLA', 'bid_spread_aysm2_TSLA', 'ask_spread_aysm2_TSLA',]:
-            ask_price_list_temp = ask_price_list5[i].resample('30S').mean()
+            ask_price_list_temp = ask_price_list5[i].resample('10S').mean()
             ask_price_list2 = pd.merge(left=ask_price_list2, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
         
@@ -1097,15 +1101,15 @@ async def trade_data_handler(data):
         row2_AMD = pd.DataFrame(d2_AMD, index = [timestamp3])
                 
         ask_price_list_AMD5 = pd.concat([ask_price_list_AMD5, row2_AMD])
-        volume_AMD2 = ask_price_list_AMD5['volume'].resample('30S').sum()
+        volume_AMD2 = ask_price_list_AMD5['volume'].resample('10S').sum()
 
 
-        ask_price_list_AMD2 = ask_price_list_AMD5['close'].resample('30S').ohlc()
+        ask_price_list_AMD2 = ask_price_list_AMD5['close'].resample('10S').ohlc()
         ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=volume_AMD2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
 
         for i in ['Open_AMD', 'High_AMD','Low_AMD','Close_AMD','best_bid_AMD', 'best_ask_AMD', 'midpoint_AMD', 'inventory_qty_AMD', 'best_bid_AMD', 'best_ask_AMD','mu_AMD','gamma_AMD','sigma_AMD','k_AMD', 'bid_alpha_AMD', 'ask_alpha_AMD', 'ask_sum_delta_vol_AMD', 'bid_sum_delta_vol_AMD', 'bid_spread_aysm_AMD', 'ask_spread_aysm_AMD', 'bid_spread_aysm2_AMD', 'ask_spread_aysm2_AMD',]:
-            ask_price_list_temp_AMD = ask_price_list_AMD5[i].resample('30S').mean()
+            ask_price_list_temp_AMD = ask_price_list_AMD5[i].resample('10S').mean()
             ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=ask_price_list_temp_AMD, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
         
@@ -1144,7 +1148,7 @@ async def create_model(data):
     t = time.process_time()
     
     take_profit_method(symbol='NVDA')
-    take_profit_method(symbol='TSLA')
+    take_profit_method(symbol='SPY')
 
     global data_out
 
@@ -1166,7 +1170,7 @@ async def create_model(data):
     print('\n Time to fetch data: \n', elapsed_time)
 
     dataset = data_out
-    symbol_list = ['NVDA', 'NVDA', 'TSLA', 'TSLA', ]
+    symbol_list = ['NVDA', 'NVDA', 'SPY', 'SPY', ]
     side_list = ['OrderSide.BUY', 'OrderSide.SELL', 'OrderSide.BUY', 'OrderSide.SELL', ]
     x_list = [dataset, dataset, dataset, dataset,]
 
@@ -1178,13 +1182,13 @@ async def create_model(data):
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
     take_profit_method(symbol='NVDA')
-    take_profit_method(symbol='TSLA')
+    take_profit_method(symbol='SPY')
     get_time_til_close(symbol='NVDA')
-    get_time_til_close(symbol='TSLA')
+    get_time_til_close(symbol='SPY')
 
 
 
-wss_client.subscribe_trades(create_model, "NVDA", "TSLA")
+wss_client.subscribe_trades(create_model, "NVDA", "SPY")
 
 wss_client.run()
 
