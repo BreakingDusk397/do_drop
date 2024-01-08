@@ -84,7 +84,7 @@ best_ask = 0.02
 bid_sum_delta_vol = 10000
 ask_sum_delta_vol = 10000
 previous_df = 0
-df = 0
+df_orderbook = 0
 
 
 def get_orderbook(symbol):
@@ -99,6 +99,7 @@ def get_orderbook(symbol):
     global midpoint_NVDA
     global midpoint_AMD
     global previous_df
+    global df_orderbook
 
     try:
         symbol = symbol
@@ -193,71 +194,67 @@ def get_orderbook(symbol):
         
 
     symbol = str(symbol)
-    previous_df = df
+    previous_df = df_orderbook
     try:
-        df = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
+        df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
     except:
-        df = previous_df
+        df_orderbook = previous_df
 
-    df['inventory'] = inventory_qty
-    #df = df.iloc[::-1]
-    df["mu"] = abs((np.log(df["Open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
-    #print('mu: ', df["mu"][:-1])
+    df_orderbook['inventory'] = inventory_qty
+    df_orderbook["mu"] = abs((np.log(df_orderbook["Open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
 
-    df['gamma'] = get_inventory_risk(symbol = symbol)
-    #print('gamma: ', df["gamma"][:-1])
-
-    df['sigma'] = ((np.log(df["Open"]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) * 100
-    #print('sigma: ', df["sigma"][:-1])
-
-    df['Volume'] = df['Volume'] + 1
+    df_orderbook['gamma'] = get_inventory_risk(symbol = symbol)
 
 
-    df['k'] = (0.5*(df['sigma'])*np.sqrt(df['Volume']/df['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))*1
-    #print('k: ', df["k"][:-1])
-    #(df['k'] / 2 * df['sigma'] * df['gamma']**2) * 100000
-    df['bid_alpha'] = bid_alpha
-    df['ask_alpha'] = ask_alpha
+    df_orderbook['sigma'] = ((np.log(df_orderbook["Open"]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) * 100
 
-    df['bid_sum_delta_vol'] = bid_sum_delta_vol
-    df['ask_sum_delta_vol'] = ask_sum_delta_vol
+
+    df_orderbook['Volume'] = df_orderbook['Volume'] + 1
+
+
+    df_orderbook['k'] = (0.5*(df_orderbook['sigma'])*np.sqrt(df_orderbook['Volume']/df_orderbook['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))*1
+
+    df_orderbook['bid_alpha'] = bid_alpha
+    df_orderbook['ask_alpha'] = ask_alpha
+
+    df_orderbook['bid_sum_delta_vol'] = bid_sum_delta_vol
+    df_orderbook['ask_sum_delta_vol'] = ask_sum_delta_vol
     
 
-    df['bid_spread_aysm'] = ((1 / df['gamma'] * np.log(1 + df['gamma'] / df['k']) + (2 * df['inventory'] + 1) / 2 * np.sqrt((df['sigma']**2 * df['gamma']) / (2 * df['k'] * df['bid_alpha']) * (1 + df['gamma'] / df['k'])**(1 + df['k'] / df['gamma']))) / 100000)
+    df_orderbook['bid_spread_aysm'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (2 * df_orderbook['inventory'] + 1) / 2 * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 100000)
 
-    df['ask_spread_aysm'] = ((1 / df['gamma'] * np.log(1 + df['gamma'] / df['k']) - (2 * df['inventory'] - 1) / 2 * np.sqrt((df['sigma']**2 * df['gamma']) / (2 * df['k'] * df['ask_alpha']) * (1 + df['gamma'] / df['k'])**(1 + df['k'] / df['gamma']))) / 100000)
+    df_orderbook['ask_spread_aysm'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) - (2 * df_orderbook['inventory'] - 1) / 2 * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 100000)
     
 
 
     
-    df['bid_spread_aysm2'] = ((1 / df['gamma'] * np.log(1 + df['gamma'] / df['k']) + (- df["mu"] / (df['gamma'] * df['sigma']**2) + (2 * df['inventory'] + 1) / 2) * np.sqrt((df['sigma']**2 * df['k']) / (2 * df['k'] * df['bid_alpha']) * (1 + df['gamma'] / df['k'])**(1 + df['k'] / df['gamma']))) / 19999998)
+    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 19999998)
 
-    df['ask_spread_aysm2'] = ((1 / df['gamma'] * np.log(1 + df['gamma'] / df['k']) + (  df["mu"] / (df['gamma'] * df['sigma']**2) - (2 * df['inventory'] - 1) / 2) * np.sqrt((df['sigma']**2 * df['k']) / (2 * df['k'] * df['ask_alpha']) * (1 + df['gamma'] / df['k'])**(1 + df['k'] / df['gamma']))) / 19999998)
+    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 19999998)
 
-    #print(df['bid_spread_aysm'][-1])
-    #print(df['ask_spread_aysm'][-1])
-    print("\n bid: \n", symbol, df['bid_spread_aysm2'][-1])
-    print("\n ask: \n", symbol, df['ask_spread_aysm2'][-1])
 
-    best_ask = df['ask_spread_aysm2'][-1]
-    best_bid = df['bid_spread_aysm2'][-1]
+    print("\n bid: \n", symbol, df_orderbook['bid_spread_aysm2'][-1])
+    print("\n ask: \n", symbol, df_orderbook['ask_spread_aysm2'][-1])
+
+    best_ask = df_orderbook['ask_spread_aysm2'][-1]
+    best_bid = df_orderbook['bid_spread_aysm2'][-1]
 
     if symbol == 'NVDA':
         midpoint_NVDA = midpoint
-        df['midpoint_NVDA'] = midpoint
+        df_orderbook['midpoint_NVDA'] = midpoint
 
     if symbol == 'SPY':
         midpoint_TSLA = midpoint
-        df['midpoint_TSLA'] = midpoint
+        df_orderbook['midpoint_TSLA'] = midpoint
 
     if symbol == 'AMD':
         midpoint_AMD = midpoint
-        df['midpoint_AMD'] = midpoint
+        df_orderbook['midpoint_AMD'] = midpoint
 
     elapsed_time = time.process_time() - t
     print('\n Time to ordebook method: \n', elapsed_time)
 
-    return best_bid, best_ask, midpoint, df, inventory_qty
+    return best_bid, best_ask, midpoint, df_orderbook, inventory_qty
 
 
 
