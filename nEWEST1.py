@@ -743,7 +743,7 @@ def make_model(dataset, symbol, side):
             dataset['OBV1'+ '_' + str(symbol)] = stats.zscore((np.sign(dataset['Open' + '_' + str(symbol)].diff()) * dataset['Volume' + '_' + str(symbol)]).fillna(0.0000001).cumsum())
             dataset['ratio'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) / (dataset["Open"])
             dataset['ratio_reversed'+ '_' + str(symbol)] = (dataset["Open"]) / (dataset["Open" + '_' + str(symbol)])
-            dataset['ratio_volu'+ '_' + str(symbol)] = dataset["Open"].pct_change() / dataset["volume"]
+            dataset['ratio_volu'+ '_' + str(symbol)] = dataset["Open"+ '_' + str(symbol)].pct_change() / dataset["Volume"+ '_' + str(symbol)]
             dataset['difference'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) - (dataset["Open"])
             dataset['difference_reversed'+ '_' + str(symbol)] = (dataset["Open"]) - (dataset["Open" + '_' + str(symbol)])
 
@@ -1040,7 +1040,7 @@ async def trade_data_handler(data):
         best_bid_TSLA, best_ask_TSLA, midpoint_TSLA, df2, inventory_qty_TSLA = get_orderbook("TSLA")
 
         d2 = {'close':[ask_price2],'volume':[volume2], 'Open_TSLA':[df2['Open'][-1]], 'High_TSLA':[df2['High'][-1]], 'Low_TSLA':[df2['Low'][-1]],
-                'Close_TSLA':[df2['Close'][-1]],'midpoint_TSLA':[midpoint_TSLA],
+                'Close_TSLA':[df2['Close'][-1]],'midpoint_TSLA':[midpoint_TSLA],'Volume_TSLA':[df2['Volume'][-1]],
                 'best_bid_TSLA':[best_bid_TSLA], 'best_ask_TSLA':[best_ask_TSLA],
                 'mu_TSLA':[df2['mu'][-1]], 'gamma_TSLA':[df2['gamma'][-1]], 'sigma_TSLA':[df2['sigma'][-1]], 'k_TSLA':[df2['k'][-1]],
                 'bid_alpha_TSLA':[df2['bid_alpha'][-1]], 'ask_alpha_TSLA':[df2['ask_alpha'][-1]], 'ask_sum_delta_vol_TSLA':[df2['ask_sum_delta_vol'][-1]], 
@@ -1059,7 +1059,7 @@ async def trade_data_handler(data):
         ask_price_list2 = pd.merge(left=ask_price_list2, right=volume2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
 
-        for i in ['Open_TSLA', 'High_TSLA','Low_TSLA','Close_TSLA', 'midpoint_TSLA', 'best_bid_TSLA','inventory_TSLA', 'best_ask_TSLA','mu_TSLA','gamma_TSLA','sigma_TSLA','k_TSLA', 'bid_alpha_TSLA', 'ask_alpha_TSLA', 'ask_sum_delta_vol_TSLA', 'bid_sum_delta_vol_TSLA', 'bid_spread_aysm2_TSLA', 'ask_spread_aysm2_TSLA',]:
+        for i in ['Open_TSLA', 'High_TSLA','Low_TSLA','Close_TSLA', 'Volume_TSLA', 'midpoint_TSLA', 'best_bid_TSLA','inventory_TSLA', 'best_ask_TSLA','mu_TSLA','gamma_TSLA','sigma_TSLA','k_TSLA', 'bid_alpha_TSLA', 'ask_alpha_TSLA', 'ask_sum_delta_vol_TSLA', 'bid_sum_delta_vol_TSLA', 'bid_spread_aysm2_TSLA', 'ask_spread_aysm2_TSLA',]:
             ask_price_list_temp = ask_price_list5[i].resample('30S').mean()
             ask_price_list2 = pd.merge(left=ask_price_list2, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
             #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
