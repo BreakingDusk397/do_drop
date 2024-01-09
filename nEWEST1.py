@@ -86,6 +86,9 @@ ask_sum_delta_vol = 10000
 previous_df = 0
 df_orderbook = 0
 
+def yf_download():
+    df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
+    return df_orderbook
 
 def get_orderbook(symbol):
 
@@ -197,11 +200,11 @@ def get_orderbook(symbol):
     
     
     try:
-        df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
+        df_orderbook = yf_download()
     except:
-        df_orderbook = previous_df.last
+        df_orderbook = df_orderbook.last
 
-    previous_df.last = df_orderbook
+    #previous_df = df_orderbook.last
 
     df_orderbook['inventory'] = inventory_qty
     df_orderbook["mu"] = abs((np.log(df_orderbook["Open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
