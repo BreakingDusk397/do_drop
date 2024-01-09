@@ -784,8 +784,8 @@ def make_model(dataset, symbol, side):
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
             #dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
             dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            dataset[str(i)+'_smooth_10'] = dataset[i].ewm(span=10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            dataset[str(i)+'_smooth_20'] = dataset[i].ewm(span=20).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            dataset[str(i)+'_smooth_10'] = dataset[i].rolling(span=10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            dataset[str(i)+'_smooth_20'] = dataset[i].rolling(span=20).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
