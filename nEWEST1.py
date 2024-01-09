@@ -346,7 +346,7 @@ def take_profit_method(symbol):
             
             trading_client.close_position(symbol)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.8:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.3:
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
@@ -358,7 +358,7 @@ def take_profit_method(symbol):
             trading_client.close_position(symbol)
             
 
-        elif float(ORDERS[1][12]) <=  -5:
+        elif float(ORDERS[1][12]) <=  -2:
 
             cancel_orders_for_symbol(symbol=symbol)
             
