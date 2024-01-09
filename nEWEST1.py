@@ -784,7 +784,7 @@ def make_model(dataset, symbol, side):
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
             #dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
             dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            #dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             dataset[str(i)+'_smooth_20'] = dataset[i].rolling(20).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         
 
@@ -870,7 +870,7 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=15, steps=10, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
+        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=15, steps=8, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
