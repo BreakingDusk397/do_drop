@@ -302,7 +302,7 @@ def get_time_til_close(symbol):
         
     
 def get_inventory_risk(symbol):
-    inventory_risk = 0.002
+    inventory_risk = 0.02
     try:
         symbol = str(symbol)
 
@@ -310,6 +310,33 @@ def get_inventory_risk(symbol):
     
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
+
+
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
+            cancel_orders_for_symbol(symbol=symbol)
+            
+            trading_client.close_position(symbol)
+
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.6:
+            cancel_orders_for_symbol(symbol=symbol)
+            
+            trading_client.close_position(symbol)
+        
+        if float(ORDERS[1][12]) >=  6:
+            
+            cancel_orders_for_symbol(symbol=symbol)
+            
+            trading_client.close_position(symbol)
+            
+
+        if float(ORDERS[1][12]) <=  -6:
+
+            cancel_orders_for_symbol(symbol=symbol)
+            
+            trading_client.close_position(symbol)
+
+
+
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "TSLA":
@@ -322,7 +349,7 @@ def get_inventory_risk(symbol):
 
         print("No inventory position.")
         inventory_qty = 1
-        inventory_risk = 0.002
+        inventory_risk = 0.02
         #print(traceback.format_exc())
         
         
@@ -340,17 +367,42 @@ def get_open_position(symbol):
     
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
+
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
+            cancel_orders_for_symbol(symbol=symbol)
+            
+            trading_client.close_position(symbol)
+
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.6:
+            cancel_orders_for_symbol(symbol=symbol)
+            
+            trading_client.close_position(symbol)
+        
+        if float(ORDERS[1][12]) >=  6:
+            
+            cancel_orders_for_symbol(symbol=symbol)
+            
+            trading_client.close_position(symbol)
+            
+
+        if float(ORDERS[1][12]) <=  -6:
+
+            cancel_orders_for_symbol(symbol=symbol)
+            
+            trading_client.close_position(symbol)
     
         inventory_qty = int(ORDERS[1][6])
 
-        return inventory_qty
-
+        
     except:
 
         print("No inventory position.")
         inventory_qty = 1
         #print(traceback.format_exc())
-        return inventory_qty
+        
+    
+    return inventory_qty
+
 
 
 
@@ -379,7 +431,7 @@ def take_profit_method(symbol):
             trading_client.close_position(symbol)
             
 
-        elif float(ORDERS[1][12]) <=  -6:
+        if float(ORDERS[1][12]) <=  -6:
 
             cancel_orders_for_symbol(symbol=symbol)
             
@@ -496,13 +548,13 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
 
 
     if side == 'OrderSide.BUY':
-        cancel_orders_for_side(symbol=symbol, side='sell')
+        cancel_orders_for_symbol(symbol=symbol, side='sell')
         best_spread = best_bid
         if float(best_spread) > -0.01:
             best_spread = best_spread + -0.05
 
     if side == 'OrderSide.SELL':
-        cancel_orders_for_side(symbol=symbol, side='buy')
+        cancel_orders_for_symbol(symbol=symbol, side='buy')
         best_spread = best_ask
         if float(best_spread) < 0.01:
             best_spread = best_spread + 0.05
@@ -608,7 +660,7 @@ def match_orders_for_symbol(symbol):
 
         if str(side) == 'PositionSide.SHORT':
 
-            cancel_orders_for_side(symbol=symbol, side='buy')
+            cancel_orders_for_symbol(symbol=symbol, side='buy')
             limit_order(symbol=symbol, 
                         spread=-0.021 + (best_bid),
                         side=OrderSide.BUY, 
@@ -622,7 +674,7 @@ def match_orders_for_symbol(symbol):
 
         if str(side) == 'PositionSide.LONG':
             
-            cancel_orders_for_side(symbol=symbol, side='sell')
+            cancel_orders_for_symbol(symbol=symbol, side='sell')
             limit_order(symbol=symbol, 
                         spread=0.021 + best_ask, 
                         side=OrderSide.SELL, 
