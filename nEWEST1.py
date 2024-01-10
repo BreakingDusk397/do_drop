@@ -527,7 +527,7 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
 
     
 
-    res = np.array(mid_price) - ((np.array(inventory) * np.array(inventory_risk) * (np.array(variance)) * (1 - (np.array(steps_in_day, dtype='float64')/np.array(total_steps_in_day))))/4)
+    res = np.array(mid_price) - ((np.array(inventory) * np.array(inventory_risk) * (np.array(variance)) * (1 - (np.array(steps_in_day, dtype='float64')/np.array(total_steps_in_day))))/40)
     #np.array(current_spread
     print("\n reservation price: \n", res)
     print("\n reservation price delta: \n", res-mid_price)
@@ -809,7 +809,7 @@ def make_model(dataset, symbol, side):
                 #y = y_SPY_sell
 
 
-        """for symbol in ['SPY','TSLA']:
+        """for symbol in ['TSLA']:
 
             dataset['spread' + '_' + str(symbol)] = dataset['Open' + '_' + str(symbol)] - ((dataset['Low' + '_' + str(symbol)] + dataset['High' + '_' + str(symbol)])/2)
             dataset['spread2' + '_' + str(symbol)] = dataset['High' + '_' + str(symbol)] - dataset['Low' + '_' + str(symbol)]
