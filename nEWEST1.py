@@ -72,6 +72,15 @@ SECRET_KEY = "laKd5n4c7pnjRT9nC6WJztVEWruDz2b1VDJab5Hg"
 
 trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
 
+symbol = symbol
+totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
+#print("Current OTP:", totp)
+
+username = "torndoff@icloud.com"
+password = "qu2t3f8Ew9BxM"
+
+login = r.login(username,password, mfa_code=totp)
+
 midpoint_SPY = 0
 midpoint_TSLA = 0
 midpoint_AMD = 0
@@ -88,31 +97,13 @@ df_orderbook = 0
 
 def yf_download():
     df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
+    yf_download.previous = df_orderbook # Creates a variable that stores the previous version of df_orderbook for when Yahoo denies the request
     return df_orderbook
 
-def get_orderbook(symbol):
-
-    t = time.process_time()
-
+def get_pricebook():
     
-    take_profit_method(symbol)
-    
-    
-    global midpoint_SPY
-    global midpoint_TSLA
-    global midpoint_AMD
-    global previous_df
-    global df_orderbook
-
     try:
-        symbol = symbol
-        totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
-        #print("Current OTP:", totp)
-
-        username = "torndoff@icloud.com"
-        password = "qu2t3f8Ew9BxM"
-
-        login = r.login(username,password, mfa_code=totp)
+        
 
 
         data = r.stocks.get_pricebook_by_symbol(symbol=symbol)
@@ -166,11 +157,38 @@ def get_orderbook(symbol):
         
 
     except:
-        ask_alpha = 0.01
-        bid_alpha = 0.01
-        print(traceback.format_exc())
-        
+        ask_alpha = 0.05
+        bid_alpha = 0.05
+        bid_sum_delta_vol = 10000
+        ask_sum_delta_vol = 10000
+        midpoint = 999
+        print(traceback.format_exc()) 
+
+    get_pricebook.previous = [ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint]
     
+
+
+    return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
+
+
+def get_orderbook(symbol):
+
+    t = time.process_time()
+
+    
+    take_profit_method(symbol)
+    
+    
+    global midpoint_SPY
+    global midpoint_TSLA
+    global midpoint_AMD
+
+
+    try:
+        ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook()        
+    except:
+       ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook.previous
+
     try:
         symbol = symbol
         trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
@@ -179,8 +197,6 @@ def get_orderbook(symbol):
         ORDERS = pd.DataFrame(position)
         inventory_qty = int(ORDERS[1][6])
 
-        avg_entry_price = float(ORDERS[1][5])
-        side = str(ORDERS[1][7])
 
     except:
 
@@ -202,9 +218,9 @@ def get_orderbook(symbol):
     try:
         df_orderbook = yf_download()
     except:
-        df_orderbook = df_orderbook.last
+        df_orderbook = yf_download.previous
 
-    #previous_df = df_orderbook.last
+    #previous_df = df_orderbook.previous
 
     df_orderbook['inventory'] = inventory_qty
     df_orderbook["mu"] = abs((np.log(df_orderbook["Open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
@@ -234,9 +250,9 @@ def get_orderbook(symbol):
 
 
     
-    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 19999998)
+    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 9999999)
 
-    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 19999998)
+    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 9999999)
 
 
     print("\n bid: \n", symbol, df_orderbook['bid_spread_aysm2'][-1])
@@ -351,19 +367,19 @@ def take_profit_method(symbol):
             
             trading_client.close_position(symbol)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.3:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.6:
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
         
-        if float(ORDERS[1][12]) >=  4:
+        if float(ORDERS[1][12]) >=  6:
             
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
             
 
-        elif float(ORDERS[1][12]) <=  -3:
+        elif float(ORDERS[1][12]) <=  -6:
 
             cancel_orders_for_symbol(symbol=symbol)
             
@@ -448,7 +464,7 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     if symbol == 'AMD':
         midpoint = midpoint_AMD
 
-    mid_price = float(midpoint)
+    mid_price = (float(midpoint) + float(df['Open'][-1])) / 2
 
     inventory = float(inventory_qty)
     inventory_risk = float(inventory_risk)
@@ -482,12 +498,16 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     if side == 'OrderSide.BUY':
         cancel_orders_for_side(symbol=symbol, side='sell')
         best_spread = best_bid
+        if float(best_spread) > -0.01:
+            best_spread = best_spread + -0.05
 
     if side == 'OrderSide.SELL':
         cancel_orders_for_side(symbol=symbol, side='buy')
         best_spread = best_ask
+        if float(best_spread) < 0.01:
+            best_spread = best_spread + 0.05
 
-    spread = best_spread + spread
+    spread = best_spread
     current_price = res
     limit_price = round(current_price + spread, 2)
 
