@@ -149,10 +149,10 @@ def get_pricebook():
         alpha = abs((ask_sum_delta_vol - bid_sum_delta_vol) / ((bid_sum_delta_vol + ask_sum_delta_vol)/2))
         ask_alpha = (ask_sum_delta_vol - bid_sum_delta_vol) / ((bid_sum_delta_vol + ask_sum_delta_vol)/2)
         if ask_alpha <= 0:
-            ask_alpha = 0.001
+            ask_alpha = 0.0002
         bid_alpha = (bid_sum_delta_vol - ask_sum_delta_vol) / ((bid_sum_delta_vol + ask_sum_delta_vol)/2)
         if bid_alpha <= 0:
-            bid_alpha = 0.001
+            bid_alpha = 0.0002
         #print("alpha:", alpha)
         
 
@@ -236,8 +236,8 @@ def get_orderbook(symbol):
 
     df_orderbook['k'] = (0.5*(df_orderbook['sigma'])*np.sqrt(df_orderbook['Volume']/df_orderbook['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))*1
 
-    df_orderbook['bid_alpha'] = bid_alpha
-    df_orderbook['ask_alpha'] = ask_alpha
+    df_orderbook['bid_alpha'] = float(bid_alpha) / 100
+    df_orderbook['ask_alpha'] = float(ask_alpha) / 100
 
     df_orderbook['bid_sum_delta_vol'] = bid_sum_delta_vol
     df_orderbook['ask_sum_delta_vol'] = ask_sum_delta_vol
@@ -249,10 +249,10 @@ def get_orderbook(symbol):
     
 
 
-    
-    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 9999999)
+    # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
+    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['bid_alpha']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['bid_alpha']) / (2 * df_orderbook['bid_alpha'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['bid_alpha'])**(1 + df_orderbook['bid_alpha'] / df_orderbook['gamma']))) / 12500)
 
-    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 9999999)
+    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['ask_alpha']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['ask_alpha']) / (2 * df_orderbook['ask_alpha'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['ask_alpha'])**(1 + df_orderbook['ask_alpha'] / df_orderbook['gamma']))) / 12500)
 
 
     print("\n bid: \n", symbol, df_orderbook['bid_spread_aysm2'][-1])
@@ -302,7 +302,7 @@ def get_time_til_close(symbol):
         
     
 def get_inventory_risk(symbol):
-    inventory_risk = 0.00002
+    inventory_risk = 0.002
     try:
         symbol = str(symbol)
 
@@ -313,16 +313,16 @@ def get_inventory_risk(symbol):
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "TSLA":
-            inventory_risk = 0.000002 * abs(inventory_qty)
+            inventory_risk = 0.02 * abs(inventory_qty)/10
 
         if symbol == 'SPY':
-            inventory_risk = 0.00002 * abs(inventory_qty)
+            inventory_risk = 0.02 * abs(inventory_qty)/10
 
     except:
 
         print("No inventory position.")
         inventory_qty = 1
-        inventory_risk = 0.00002
+        inventory_risk = 0.002
         #print(traceback.format_exc())
         
         
