@@ -742,7 +742,7 @@ def z_score_df(df):
 
 @jit(cache=True)
 def make_model(dataset, symbol, side):
-    try: 
+
         t0 = time.time()
 
         symbol = str(symbol)
@@ -1039,9 +1039,7 @@ def make_model(dataset, symbol, side):
         t1 = time.time()
         total = t1-t0
         print('\n Total time to order: \n', total)
-    except:
-        print("model error.")  
-        print(traceback.format_exc())
+
 
 
 
