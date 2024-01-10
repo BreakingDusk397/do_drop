@@ -250,9 +250,9 @@ def get_orderbook(symbol):
 
 
     # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
-    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['bid_alpha']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['bid_alpha']) / (2 * df_orderbook['bid_alpha'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['bid_alpha'])**(1 + df_orderbook['bid_alpha'] / df_orderbook['gamma']))) / 12500)
+    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['bid_alpha']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['bid_alpha']) / (2 * df_orderbook['bid_alpha'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['bid_alpha'])**(1 + df_orderbook['bid_alpha'] / df_orderbook['gamma']))) / 1250000)
 
-    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['ask_alpha']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['ask_alpha']) / (2 * df_orderbook['ask_alpha'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['ask_alpha'])**(1 + df_orderbook['ask_alpha'] / df_orderbook['gamma']))) / 12500)
+    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['ask_alpha']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['ask_alpha']) / (2 * df_orderbook['ask_alpha'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['ask_alpha'])**(1 + df_orderbook['ask_alpha'] / df_orderbook['gamma']))) / 1250000)
 
 
     print("\n bid: \n", symbol, df_orderbook['bid_spread_aysm2'][-1])
@@ -809,7 +809,7 @@ def make_model(dataset, symbol, side):
                 #y = y_SPY_sell
 
 
-        """for symbol in ['TSLA']:
+        for symbol in ['TSLA']:
 
             dataset['spread' + '_' + str(symbol)] = dataset['Open' + '_' + str(symbol)] - ((dataset['Low' + '_' + str(symbol)] + dataset['High' + '_' + str(symbol)])/2)
             dataset['spread2' + '_' + str(symbol)] = dataset['High' + '_' + str(symbol)] - dataset['Low' + '_' + str(symbol)]
@@ -827,12 +827,8 @@ def make_model(dataset, symbol, side):
             dataset['difference'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) - (dataset["open"])
             dataset['difference_reversed'+ '_' + str(symbol)] = (dataset["open"]) - (dataset["Open" + '_' + str(symbol)])
 
-            #dataset['ratio_v'] = (dataset["Volatility"]) / (dataset["Volatility" + '_' + str(symbol)])
-            #dataset['ratio_reversed_v'] = (dataset["Volatility" + '_' + str(symbol)]) / (dataset["Volatility"])
-
-            #dataset['difference_v'] = (dataset["Volatility"]) - (dataset["Volatility" + '_' + str(symbol)])
-            #dataset['difference_reversed_v'] = (dataset["Volatility" + '_' + str(symbol)]) - (dataset["Volatility"])
-        """
+            
+        
 
         dataset['spread'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
