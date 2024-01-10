@@ -149,10 +149,10 @@ def get_pricebook():
         alpha = abs((ask_sum_delta_vol - bid_sum_delta_vol) / ((bid_sum_delta_vol + ask_sum_delta_vol)/2))
         ask_alpha = (ask_sum_delta_vol - bid_sum_delta_vol) / ((bid_sum_delta_vol + ask_sum_delta_vol)/2)
         if ask_alpha <= 0:
-            ask_alpha = 0.0002
+            ask_alpha = 0.002
         bid_alpha = (bid_sum_delta_vol - ask_sum_delta_vol) / ((bid_sum_delta_vol + ask_sum_delta_vol)/2)
         if bid_alpha <= 0:
-            bid_alpha = 0.0002
+            bid_alpha = 0.002
         #print("alpha:", alpha)
         
 
@@ -203,8 +203,8 @@ def get_orderbook(symbol):
         print("No inventory position.")
         inventory_qty = 1
         #print(traceback.format_exc())
-        ask_alpha = 0.01
-        bid_alpha = 0.01
+        ask_alpha = 0.05
+        bid_alpha = 0.05
         
         
         
@@ -302,7 +302,7 @@ def get_time_til_close(symbol):
         
     
 def get_inventory_risk(symbol):
-    inventory_risk = 0.02
+    inventory_risk = 0.002
     try:
         symbol = str(symbol)
 
@@ -340,16 +340,16 @@ def get_inventory_risk(symbol):
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "TSLA":
-            inventory_risk = 0.02 * abs(inventory_qty)/10
+            inventory_risk = 0.002 * abs(inventory_qty)
 
         if symbol == 'SPY':
-            inventory_risk = 0.02 * abs(inventory_qty)/10
+            inventory_risk = 0.002 * abs(inventory_qty)
 
     except:
 
         print("No inventory position.")
         inventory_qty = 1
-        inventory_risk = 0.02
+        inventory_risk = 0.002
         #print(traceback.format_exc())
         
         
@@ -477,7 +477,7 @@ def take_profit_method(symbol):
 
 
 
-@jit
+@jit(cache=True)
 def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multiplier, loss_limit_multiplier, qty, inventory_risk):
     
     symbol = str(symbol)
@@ -537,7 +537,7 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
 
     
 
-
+    cancel_orders_for_symbol(symbol)
     
     best_spread = 0.0001
 
@@ -548,16 +548,23 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
 
 
     if side == 'OrderSide.BUY':
-        cancel_orders_for_symbol(symbol=symbol, side='sell')
+        cancel_orders_for_side(symbol=symbol, side='sell')
         best_spread = best_bid
         if float(best_spread) > -0.01:
             best_spread = best_spread + -0.05
 
+        stop_loss = res - (best_spread * 3)
+        take_profit = res + (best_spread * 3)
+
     if side == 'OrderSide.SELL':
-        cancel_orders_for_symbol(symbol=symbol, side='buy')
+        cancel_orders_for_side(symbol=symbol, side='buy')
         best_spread = best_ask
+        
         if float(best_spread) < 0.01:
             best_spread = best_spread + 0.05
+
+        stop_loss = res + (best_spread * 3)
+        take_profit = res - (best_spread * 3)
 
     spread = best_spread
     current_price = res
@@ -582,7 +589,7 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     limit_order_data = trading_client.submit_order(market_order_data)
 
     #print("spread, limit_price: ", spread, limit_price)
-    #print(limit_order_data)
+    print(limit_order_data)
 
 
             
@@ -660,7 +667,7 @@ def match_orders_for_symbol(symbol):
 
         if str(side) == 'PositionSide.SHORT':
 
-            cancel_orders_for_symbol(symbol=symbol, side='buy')
+            cancel_orders_for_side(symbol=symbol, side='buy')
             limit_order(symbol=symbol, 
                         spread=-0.021 + (best_bid),
                         side=OrderSide.BUY, 
@@ -674,7 +681,7 @@ def match_orders_for_symbol(symbol):
 
         if str(side) == 'PositionSide.LONG':
             
-            cancel_orders_for_symbol(symbol=symbol, side='sell')
+            cancel_orders_for_side(symbol=symbol, side='sell')
             limit_order(symbol=symbol, 
                         spread=0.021 + best_ask, 
                         side=OrderSide.SELL, 
@@ -733,7 +740,7 @@ def z_score_df(df):
     df = df.apply(lambda x : z_score(x))
     return df
 
-
+@jit(cache=True)
 def make_model(dataset, symbol, side):
     try: 
         t0 = time.time()
@@ -943,7 +950,7 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=15, steps=8, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
+        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=20, steps=8, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
