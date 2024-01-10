@@ -250,9 +250,9 @@ def get_orderbook(symbol):
 
 
     # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
-    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['bid_alpha']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['bid_alpha']) / (2 * df_orderbook['bid_alpha'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['bid_alpha'])**(1 + df_orderbook['bid_alpha'] / df_orderbook['gamma']))) / 1250000)
+    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['bid_alpha']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['bid_alpha']) / (2 * df_orderbook['bid_alpha'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['bid_alpha'])**(1 + df_orderbook['bid_alpha'] / df_orderbook['gamma']))) / 2500000)
 
-    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['ask_alpha']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['ask_alpha']) / (2 * df_orderbook['ask_alpha'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['ask_alpha'])**(1 + df_orderbook['ask_alpha'] / df_orderbook['gamma']))) / 1250000)
+    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['ask_alpha']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['ask_alpha']) / (2 * df_orderbook['ask_alpha'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['ask_alpha'])**(1 + df_orderbook['ask_alpha'] / df_orderbook['gamma']))) / 2500000)
 
 
     print("\n bid: \n", symbol, df_orderbook['bid_spread_aysm2'][-1])
@@ -589,7 +589,7 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     limit_order_data = trading_client.submit_order(market_order_data)
 
     #print("spread, limit_price: ", spread, limit_price)
-    print(limit_order_data)
+    #print(limit_order_data)
 
 
             
@@ -740,9 +740,9 @@ def z_score_df(df):
     df = df.apply(lambda x : z_score(x))
     return df
 
-@jit(cache=True)
-def make_model(dataset, symbol, side):
 
+def make_model(dataset, symbol, side):
+    try: 
         t0 = time.time()
 
         symbol = str(symbol)
@@ -1039,7 +1039,9 @@ def make_model(dataset, symbol, side):
         t1 = time.time()
         total = t1-t0
         print('\n Total time to order: \n', total)
-
+    except:
+        print("model error.")  
+        print(traceback.format_exc())
 
 
 
