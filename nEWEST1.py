@@ -176,7 +176,7 @@ def get_orderbook(symbol):
     t = time.process_time()
 
     
-    take_profit_method(symbol)
+    #take_profit_method(symbol)
     
     
     global midpoint_SPY
@@ -516,7 +516,8 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     if symbol == 'AMD':
         midpoint = midpoint_AMD
 
-    mid_price = (float(midpoint) + float(df['Open'][-1])) / 2
+    mid_price = (float(midpoint))
+                 #+ float(df['Open'][-1])) / 2
 
     inventory = float(inventory_qty)
     inventory_risk = float(inventory_risk)
@@ -537,7 +538,7 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
 
     
 
-    cancel_orders_for_symbol(symbol)
+    #cancel_orders_for_symbol(symbol)
     
     best_spread = 0.0001
 
@@ -760,7 +761,7 @@ def make_model(dataset, symbol, side):
 
 
         # Feature params
-        future_period = 1
+        future_period = 2
 
 
         future_period1 = 10
@@ -800,20 +801,7 @@ def make_model(dataset, symbol, side):
         """
  
 
-        if str(side) == 'OrderSide.BUY':
-            side = OrderSide.BUY
-            if symbol == 'TSLA':
-                y = y
-            #if symbol == 'SPY':
-                #y = y_SPY
-
-
-        if str(side) == 'OrderSide.SELL':
-            side = OrderSide.SELL
-            if symbol == 'TSLA':
-                y = y_sell
-            #if symbol == 'SPY':
-                #y = y_SPY_sell
+        
 
 
         for symbol in ['TSLA']:
@@ -909,6 +897,7 @@ def make_model(dataset, symbol, side):
         
 
         y = y.dropna()
+        y_sell = y_sell.dropna()
 
         dataset = dataset.apply(pd.to_numeric, downcast='float')
         dataset = dataset.apply(pd.to_numeric, downcast='integer')
@@ -920,8 +909,24 @@ def make_model(dataset, symbol, side):
         
         
         dataset = dataset[dataset.index.isin(y.index)]
+        dataset_sell = dataset[dataset.index.isin(y_sell.index)]
         #dataset_SPY = dataset_SPY[dataset_SPY.index.isin(y_SPY.index)]
 
+        if str(side) == 'OrderSide.BUY':
+            side = OrderSide.BUY
+            if symbol == 'TSLA':
+                y = y
+            #if symbol == 'SPY':
+                #y = y_SPY
+
+
+        if str(side) == 'OrderSide.SELL':
+            side = OrderSide.SELL
+            if symbol == 'TSLA':
+                y = y_sell
+                dataset = dataset_sell
+            #if symbol == 'SPY':
+                #y = y_SPY_sell
 
         
         #print('\n dataset: \n', dataset)
@@ -1272,7 +1277,7 @@ async def create_model(data):
     print('\n ------- Current Local Machine Time ------- \n', now1)
     take_profit_method(symbol='TSLA')
     #take_profit_method(symbol='SPY')
-    get_time_til_close(symbol='TSLA')
+    #get_time_til_close(symbol='TSLA')
     #get_time_til_close(symbol='SPY')
 
 
