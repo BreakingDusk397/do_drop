@@ -910,7 +910,7 @@ def make_model(dataset, symbol, side):
         test_dataset = cb.Pool(X_test2, y_test2)
         valid_dataset = cb.Pool(X_valid, y_valid)
         
-        catboost_class = CatBoostClassifier(iterations=300, early_stopping_rounds=5, silent=True, thread_count=-1)
+        catboost_class = CatBoostClassifier(iterations=500, early_stopping_rounds=5, silent=True, thread_count=-1)
         """
         my_file = Path(f'model_{symbol}_{side}') # file path for persistant model
         if my_file.exists():
@@ -1054,9 +1054,9 @@ async def trade_data_handler(data):
         #print('\n row: \n', row)
         
         ask_price_list = pd.concat([ask_price_list, row])
-        volume = ask_price_list['volume'].resample('2S').sum()
+        volume = ask_price_list['volume'].resample('5S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('2S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('5S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
 
