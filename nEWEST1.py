@@ -65,7 +65,7 @@ print(datetime.now())
 
 
 
-symbol = "TSLA"
+symbol = "UPRO"
 BASE_URL = "https://paper-api.alpaca.markets"
 API_KEY = "PKBX5XZQ1JG2CEODIOKD"
 SECRET_KEY = "laKd5n4c7pnjRT9nC6WJztVEWruDz2b1VDJab5Hg"
@@ -82,7 +82,7 @@ password = "qu2t3f8Ew9BxM"
 login = r.login(username,password, mfa_code=totp)
 
 midpoint_SPY = 0
-midpoint_TSLA = 0
+midpoint_UPRO = 0
 midpoint_AMD = 0
 midpoint = 0
 ask_alpha = 0.01
@@ -180,7 +180,7 @@ def get_orderbook(symbol):
     
     
     global midpoint_SPY
-    global midpoint_TSLA
+    global midpoint_UPRO
     global midpoint_AMD
 
 
@@ -261,9 +261,9 @@ def get_orderbook(symbol):
     best_ask = df_orderbook['ask_spread_aysm2'][-1]
     best_bid = df_orderbook['bid_spread_aysm2'][-1]
 
-    if symbol == 'TSLA':
-        midpoint_TSLA = midpoint
-        df_orderbook['midpoint_TSLA'] = midpoint
+    if symbol == 'UPRO':
+        midpoint_UPRO = midpoint
+        df_orderbook['midpoint_UPRO'] = midpoint
 
     if symbol == 'SPY':
         midpoint_SPY = midpoint
@@ -339,7 +339,7 @@ def get_inventory_risk(symbol):
 
         inventory_qty = int(ORDERS[1][6])
 
-        if symbol == "TSLA":
+        if symbol == "UPRO":
             inventory_risk = 0.002 * abs(inventory_qty)
 
         if symbol == 'SPY':
@@ -507,8 +507,8 @@ def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multipli
     #steps_in_day = 100
     #mid_price = float(current_price)
 
-    if symbol == 'TSLA':
-        midpoint = midpoint_TSLA
+    if symbol == 'UPRO':
+        midpoint = midpoint_UPRO
 
     if symbol == 'SPY':
         midpoint = midpoint_SPY
@@ -815,7 +815,7 @@ def make_model(dataset, symbol, side):
             #dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
             dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            #dataset[str(i)+'_smooth_20'] = dataset[i].rolling(20).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            dataset[str(i)+'_smooth_60'] = dataset[i].rolling(60).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
@@ -876,7 +876,7 @@ def make_model(dataset, symbol, side):
 
         if str(side) == 'OrderSide.BUY':
             side = OrderSide.BUY
-            if symbol == 'TSLA':
+            if symbol == 'UPRO':
                 y = y
             #if symbol == 'SPY':
                 #y = y_SPY
@@ -884,7 +884,7 @@ def make_model(dataset, symbol, side):
 
         if str(side) == 'OrderSide.SELL':
             side = OrderSide.SELL
-            if symbol == 'TSLA':
+            if symbol == 'UPRO':
                 y = y_sell
                 dataset = dataset_sell
             #if symbol == 'SPY':
@@ -917,7 +917,7 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=5, steps=8, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
+        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=20, steps=3, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
@@ -1033,7 +1033,7 @@ async def trade_data_handler(data):
     t = time.process_time()
 
     
-    #take_profit_method(symbol='TSLA')
+    #take_profit_method(symbol='UPRO')
     #take_profit_method(symbol='SPY')
     #print('\n Raw Data: \n', data)
     df = pd.DataFrame(data)
@@ -1041,7 +1041,7 @@ async def trade_data_handler(data):
     symbol = df[1][0]
 
 
-    if symbol == "TSLA":
+    if symbol == "UPRO":
         timestamp = df[1][1]
         ask_price = df[1][3]
         volume = df[1][4]
@@ -1054,16 +1054,16 @@ async def trade_data_handler(data):
         #print('\n row: \n', row)
         
         ask_price_list = pd.concat([ask_price_list, row])
-        volume = ask_price_list['volume'].resample('1S').sum()
+        volume = ask_price_list['volume'].resample('2S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('1S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('2S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
 
         ask_price_list3 = ask_price_list3.ffill()
 
 
-        #print('\n ask_price_list_TSLA: \n', ask_price_list3)
+        #print('\n ask_price_list_UPRO: \n', ask_price_list3)
         elapsed_time = time.process_time() - t
         print('\n Time to fetch data: \n', elapsed_time)
         return ask_price_list3
@@ -1076,7 +1076,7 @@ async def create_model(data):
 
     t = time.process_time()
     
-    take_profit_method(symbol='TSLA')
+    take_profit_method(symbol='UPRO')
     #take_profit_method(symbol='SPY')
 
     global data_out
@@ -1089,7 +1089,7 @@ async def create_model(data):
     data_out.drop(data_out.filter(regex='_y$').columns, axis=1, inplace=True)
     
     dataset = data_out
-    symbol_list = ['TSLA', 'TSLA', ]
+    symbol_list = ['UPRO', 'UPRO', ]
     side_list = ['OrderSide.BUY', 'OrderSide.SELL' ]
     x_list = [dataset, dataset]
 
@@ -1100,14 +1100,14 @@ async def create_model(data):
 
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
-    #take_profit_method(symbol='TSLA')
+    #take_profit_method(symbol='UPRO')
     #take_profit_method(symbol='SPY')
-    #get_time_til_close(symbol='TSLA')
+    #get_time_til_close(symbol='UPRO')
     #get_time_til_close(symbol='SPY')
 
 
 
-wss_client.subscribe_trades(create_model, "TSLA")
+wss_client.subscribe_trades(create_model, "UPRO")
 
 wss_client.run()
 
