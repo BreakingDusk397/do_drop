@@ -254,7 +254,7 @@ def get_orderbook(symbol):
 
     df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['ask_alpha']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['ask_alpha']) / (2 * df_orderbook['ask_alpha'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['ask_alpha'])**(1 + df_orderbook['ask_alpha'] / df_orderbook['gamma']))) / 2500000)
 
-
+    print(df_orderbook)
     print("\n bid: \n", symbol, df_orderbook['bid_spread_aysm2'][-1])
     print("\n ask: \n", symbol, df_orderbook['ask_spread_aysm2'][-1])
 
@@ -312,24 +312,24 @@ def get_inventory_risk(symbol):
         ORDERS = pd.DataFrame(position)
 
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.10:
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.6:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.9:
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
         
-        if float(ORDERS[1][12]) >=  6:
+        if float(ORDERS[1][12]) >=  3:
             
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
             
 
-        if float(ORDERS[1][12]) <=  -6:
+        if float(ORDERS[1][12]) <=  -60:
 
             cancel_orders_for_symbol(symbol=symbol)
             
@@ -368,24 +368,24 @@ def get_open_position(symbol):
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.10:
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.6:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.9:
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
         
-        if float(ORDERS[1][12]) >=  6:
+        if float(ORDERS[1][12]) >=  3:
             
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
             
 
-        if float(ORDERS[1][12]) <=  -6:
+        if float(ORDERS[1][12]) <=  -60:
 
             cancel_orders_for_symbol(symbol=symbol)
             
@@ -414,24 +414,24 @@ def take_profit_method(symbol):
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.10:
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.6:
+        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.9:
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
         
-        if float(ORDERS[1][12]) >=  6:
+        if float(ORDERS[1][12]) >=  3:
             
             cancel_orders_for_symbol(symbol=symbol)
             
             trading_client.close_position(symbol)
             
 
-        if float(ORDERS[1][12]) <=  -6:
+        if float(ORDERS[1][12]) <=  -60:
 
             cancel_orders_for_symbol(symbol=symbol)
             
@@ -783,47 +783,9 @@ def make_model(dataset, symbol, side):
         y_sell = y_sell.dropna(how='any')
         dataset = dataset.drop(['future_return'], axis=1)
 
-        """
-
-        dataset['future_return_SPY'] = dataset['open_SPY'].pct_change(future_period).shift(-future_period)
-        y_SPY = np.sign(dataset['future_return_SPY'])
-        y_SPY = y_SPY.replace({-1:0})
-        y_SPY = y_SPY.dropna()
-
-        y_SPY_sell = np.sign(dataset['future_return_SPY'])
-
-        y_SPY_sell = y_SPY_sell.replace({1:0})
-        y_SPY_sell = y_SPY_sell.replace({-1:1})
-
-        y_SPY_sell = y_SPY_sell.dropna(how='any')
-
-        dataset = dataset.drop(['future_return_SPY'], axis=1)
-        """
- 
-
-        
 
 
-        for symbol in ['TSLA']:
-
-            dataset['spread' + '_' + str(symbol)] = dataset['Open' + '_' + str(symbol)] - ((dataset['Low' + '_' + str(symbol)] + dataset['High' + '_' + str(symbol)])/2)
-            dataset['spread2' + '_' + str(symbol)] = dataset['High' + '_' + str(symbol)] - dataset['Low' + '_' + str(symbol)]
-            dataset['Volatility' + '_' + str(symbol)] = (np.log(dataset['Open' + '_' + str(symbol)]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
-            dataset['Volatility2' + '_' + str(symbol)] = (np.log(dataset['Volatility' + '_' + str(symbol)]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
-            dataset['last_return1'+ '_' + str(symbol)] = np.log(dataset['Open' + '_' + str(symbol)]).pct_change()
-            dataset['std_normalized1'+ '_' + str(symbol)] = np.log(dataset['Open' + '_' + str(symbol)]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-            dataset['ma_ratio1'+ '_' + str(symbol)] = np.log(dataset['Open' + '_' + str(symbol)]).rolling(ma_period).apply(ma_ratio, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-            #dataset['price_deviation1'+ '_' + str(symbol)] = np.log(dataset['open' + '_' + str(symbol)]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-            #dataset['volume_deviation1'] = np.log(dataset['volume1']).rolling(volume_deviation_period).apply(values_deviation)
-            dataset['OBV1'+ '_' + str(symbol)] = stats.zscore((np.sign(dataset['Open' + '_' + str(symbol)].diff()) * dataset['Volume' + '_' + str(symbol)]).fillna(0.0000001).cumsum())
-            dataset['ratio'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) / (dataset["open"])
-            dataset['ratio_reversed'+ '_' + str(symbol)] = (dataset["open"]) / (dataset["Open" + '_' + str(symbol)])
-            dataset['ratio_volu'+ '_' + str(symbol)] = dataset["Open"+ '_' + str(symbol)].pct_change() / dataset["Volume"+ '_' + str(symbol)]
-            dataset['difference'+ '_' + str(symbol)] = (dataset["Open" + '_' + str(symbol)]) - (dataset["open"])
-            dataset['difference_reversed'+ '_' + str(symbol)] = (dataset["open"]) - (dataset["Open" + '_' + str(symbol)])
-
-            
-        
+    
 
         dataset['spread'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
@@ -955,7 +917,7 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=20, steps=8, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
+        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=5, steps=8, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
@@ -1085,35 +1047,18 @@ async def trade_data_handler(data):
         volume = df[1][4]
         global ask_price_list
         global ask_price_list3
-        best_bid_TSLA, best_ask_TSLA, midpoint_TSLA, df1, inventory_qty_TSLA = get_orderbook("TSLA")
-
-        d = {'close':[ask_price],'volume':[volume], 'Open_TSLA':float(df1['Open'][-1]), 'High_TSLA':[df1['High'][-1]],
-                'Low_TSLA':[df1['Low'][-1]], 'Close_TSLA':[df1['Close'][-1]], 
-                'Volume_TSLA':[df1['Volume'][-1]],
-                'mu_TSLA':[df1['mu'][-1]], 'gamma_TSLA':[df1['gamma'][-1]], 'sigma_TSLA':[df1['sigma'][-1]], 'k_TSLA':[df1['k'][-1]],
-                'bid_alpha_TSLA':[df1['bid_alpha'][-1]], 'ask_alpha_TSLA':[df1['ask_alpha'][-1]],
-                'ask_sum_delta_vol_TSLA':[df1['ask_sum_delta_vol'][-1]], 
-                'bid_sum_delta_vol_TSLA':[df1['bid_sum_delta_vol'][-1]], 
-                'inventory_TSLA':[df1['inventory'][-1]],
-                'bid_spread_aysm2_TSLA':[df1['bid_spread_aysm2'][-1]], 
-                'ask_spread_aysm2_TSLA':[df1['ask_spread_aysm2'][-1]],
-                'midpoint_TSLA':[midpoint_TSLA],
-                'best_bid_TSLA':[best_bid_TSLA], 'best_ask_TSLA':[best_ask_TSLA],
-                }
+        
+        d = {'close':[ask_price],'volume':[volume]}
         
         row = pd.DataFrame(d, index = [timestamp])
         #print('\n row: \n', row)
         
         ask_price_list = pd.concat([ask_price_list, row])
-        volume = ask_price_list['volume'].resample('15S').sum()
+        volume = ask_price_list['volume'].resample('1S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('15S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('1S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-        #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
-        for i in ['Open_TSLA', 'High_TSLA','Low_TSLA','Close_TSLA', 'Volume_TSLA', 'best_bid_TSLA', 'inventory_TSLA', 'best_ask_TSLA', 'midpoint_TSLA', 'mu_TSLA','gamma_TSLA','sigma_TSLA','k_TSLA', 'bid_alpha_TSLA', 'ask_alpha_TSLA', 'ask_sum_delta_vol_TSLA', 'bid_sum_delta_vol_TSLA', 'bid_spread_aysm2_TSLA', 'ask_spread_aysm2_TSLA',]:
-            ask_price_list_temp = ask_price_list[i].resample('15S').mean()
-            ask_price_list3 = pd.merge(left=ask_price_list3, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-            #ask_price_list3.drop(ask_price_list3.filter(regex='_y$').columns, axis=1, inplace=True)
+
 
         ask_price_list3 = ask_price_list3.ffill()
 
@@ -1122,116 +1067,6 @@ async def trade_data_handler(data):
         elapsed_time = time.process_time() - t
         print('\n Time to fetch data: \n', elapsed_time)
         return ask_price_list3
-
-
-    
-    """
-
-    if symbol == 'SPY':
-            
-        timestamp2 = df[1][1]
-        ask_price2 = df[1][3]
-        volume2 = df[1][4]
-        global ask_price_list5
-        global ask_price_list2
-
-        best_bid_SPY, best_ask_SPY, midpoint_SPY, df2, inventory_qty_SPY = get_orderbook("SPY")
-
-        d2 = {'close':[ask_price2],'volume':[volume2], 'Open_SPY':[df2['Open'][-1]], 'High_SPY':[df2['High'][-1]], 'Low_SPY':[df2['Low'][-1]],
-                'Close_SPY':[df2['Close'][-1]],'midpoint_SPY':[midpoint_SPY],'Volume_SPY':[df2['Volume'][-1]],
-                'best_bid_SPY':[best_bid_SPY], 'best_ask_SPY':[best_ask_SPY],
-                'mu_SPY':[df2['mu'][-1]], 'gamma_SPY':[df2['gamma'][-1]], 'sigma_SPY':[df2['sigma'][-1]], 'k_SPY':[df2['k'][-1]],
-                'bid_alpha_SPY':[df2['bid_alpha'][-1]], 'ask_alpha_SPY':[df2['ask_alpha'][-1]], 'ask_sum_delta_vol_SPY':[df2['ask_sum_delta_vol'][-1]], 
-                'bid_sum_delta_vol_SPY':[df2['bid_sum_delta_vol'][-1]], 
-                'inventory_SPY':[df2['inventory'][-1]],
-                'bid_spread_aysm2_SPY':[df2['bid_spread_aysm2'][-1]], 
-                'ask_spread_aysm2_SPY':[df2['ask_spread_aysm2'][-1]], }
-        
-        row2 = pd.DataFrame(d2, index = [timestamp2])
-                
-        ask_price_list5 = pd.concat([ask_price_list5, row2])
-        volume2 = ask_price_list5['volume'].resample('15S').sum()
-
-
-        ask_price_list2 = ask_price_list5['close'].resample('15S').ohlc()
-        ask_price_list2 = pd.merge(left=ask_price_list2, right=volume2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-        #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
-
-        for i in ['Open_SPY', 'High_SPY','Low_SPY','Close_SPY', 'Volume_SPY', 'midpoint_SPY', 'best_bid_SPY','inventory_SPY', 'best_ask_SPY','mu_SPY','gamma_SPY','sigma_SPY','k_SPY', 'bid_alpha_SPY', 'ask_alpha_SPY', 'ask_sum_delta_vol_SPY', 'bid_sum_delta_vol_SPY', 'bid_spread_aysm2_SPY', 'ask_spread_aysm2_SPY',]:
-            ask_price_list_temp = ask_price_list5[i].resample('15S').mean()
-            ask_price_list2 = pd.merge(left=ask_price_list2, right=ask_price_list_temp, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-            #ask_price_list2.drop(ask_price_list2.filter(regex='_y$').columns, axis=1, inplace=True)
-        
-        ask_price_list2 = ask_price_list2.ffill()
-        ask_price_list2 = ask_price_list2.rename(columns={"open":"open_SPY", "high":"high_SPY", "low":"low_SPY", "close":"close_SPY", "volume":"volume_SPY"})
-
-        #print('\n ask_price_list_SPY: \n', ask_price_list2)
-        elapsed_time = time.process_time() - t
-        print('\n Time to fetch data: \n', elapsed_time)
-        return ask_price_list2
-
-    
-    if symbol == 'AMD':
-            
-        timestamp3 = df[1][1]
-        ask_price3 = df[1][3]
-        volume3 = df[1][4]
-        global ask_price_list_AMD5
-        global ask_price_list_AMD2
-
-        best_bid_AMD, best_ask_AMD, midpoint_AMD, df3, inventory_qty_AMD = get_orderbook("AMD")
-
-        d2_AMD = {'close':[ask_price3],'volume':[volume3], 'Open_AMD':[df3['Open'][-1]], 'High_AMD':[df3['High'][-1]], 'Low_AMD':[df3['Low'][-1]],
-                        'Close_AMD':[df3['Close'][-1]],'midpoint_AMD':[midpoint_AMD], 'inventory_qty_AMD':[inventory_qty_AMD], 'best_bid_AMD':[best_bid_AMD], 
-                        'best_ask_AMD':[best_ask_AMD],
-                        'mu_AMD':[df3['mu'][-1]], 'gamma_AMD':[df3['gamma'][-1]], 'sigma_AMD':[df3['sigma'][-1]], 'k_AMD':[df3['k'][-1]],
-                        'bid_alpha_AMD':[df3['bid_alpha'][-1]], 'ask_alpha_AMD':[df3['ask_alpha'][-1]], 'ask_sum_delta_vol_AMD':[df3['ask_sum_delta_vol'][-1]], 
-                        'bid_sum_delta_vol_AMD':[df3['bid_sum_delta_vol'][-1]], 
-                        'bid_spread_aysm_AMD':[df3['bid_spread_aysm'][-1]], 
-                        'ask_spread_aysm_AMD':[df3['ask_spread_aysm'][-1]], 
-                        'bid_spread_aysm2_AMD':[df3['bid_spread_aysm2'][-1]], 
-                        'ask_spread_aysm2_AMD':[df3['ask_spread_aysm2'][-1]], }
-        
-        row2_AMD = pd.DataFrame(d2_AMD, index = [timestamp3])
-                
-        ask_price_list_AMD5 = pd.concat([ask_price_list_AMD5, row2_AMD])
-        volume_AMD2 = ask_price_list_AMD5['volume'].resample('15S').sum()
-
-
-        ask_price_list_AMD2 = ask_price_list_AMD5['close'].resample('15S').ohlc()
-        ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=volume_AMD2, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-        #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
-
-        for i in ['Open_AMD', 'High_AMD','Low_AMD','Close_AMD','best_bid_AMD', 'best_ask_AMD', 'midpoint_AMD', 'inventory_qty_AMD', 'best_bid_AMD', 'best_ask_AMD','mu_AMD','gamma_AMD','sigma_AMD','k_AMD', 'bid_alpha_AMD', 'ask_alpha_AMD', 'ask_sum_delta_vol_AMD', 'bid_sum_delta_vol_AMD', 'bid_spread_aysm_AMD', 'ask_spread_aysm_AMD', 'bid_spread_aysm2_AMD', 'ask_spread_aysm2_AMD',]:
-            ask_price_list_temp_AMD = ask_price_list_AMD5[i].resample('15S').mean()
-            ask_price_list_AMD2 = pd.merge(left=ask_price_list_AMD2, right=ask_price_list_temp_AMD, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-            #ask_price_list_AMD2.drop(ask_price_list_AMD2.filter(regex='_y$').columns, axis=1, inplace=True)
-        
-        ask_price_list_AMD2 = ask_price_list_AMD2.ffill()
-        ask_price_list_AMD2 = ask_price_list_AMD2.rename(columns={"open":"open_AMD", "high":"high_AMD", "low":"low_AMD", "close":"close_AMD", "volume":"volume_AMD"})
-
-        #print('\n ask_price_list_AMD2: \n', ask_price_list_AMD2)
-        return ask_price_list_AMD2
-    """
-    
-
-        
-        
-
-    """ask_price_list4 = pd.merge(left=ask_price_list3, right=ask_price_list2, left_index=True, right_index=True)
-    ask_price_list4 = pd.merge(left=ask_price_list4, right=ask_price_list_AMD2, left_index=True, right_index=True)
-    
-    ask_price_list4 = ask_price_list4.ffill()
-    print('\n latest merged df: \n', ask_price_list4)
-    print('\n latest data recieved: \n', ask_price_list4[-1:])
-
-    return ask_price_list4"""
-
-
-
-
-
-
 
 
             
@@ -1252,17 +1087,7 @@ async def create_model(data):
     data_out = pd.merge(left=data_in, right=data_out, left_index=True, right_index=True, how='outer', suffixes=('', '_y'))
 
     data_out.drop(data_out.filter(regex='_y$').columns, axis=1, inplace=True)
-
-
     
-    data_out = data_out.ffill()
-    data_out = data_out.fillna(0.0000001)
-    #print('\n latest merged df: \n', data_out)
-    #print('\n latest data recieved: \n', data_out[-1:])
-
-    elapsed_time = time.process_time() - t
-    print('\n Time to fetch data: \n', elapsed_time)
-
     dataset = data_out
     symbol_list = ['TSLA', 'TSLA', ]
     side_list = ['OrderSide.BUY', 'OrderSide.SELL' ]
@@ -1275,7 +1100,7 @@ async def create_model(data):
 
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
-    take_profit_method(symbol='TSLA')
+    #take_profit_method(symbol='TSLA')
     #take_profit_method(symbol='SPY')
     #get_time_til_close(symbol='TSLA')
     #get_time_til_close(symbol='SPY')
