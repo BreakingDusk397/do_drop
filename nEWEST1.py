@@ -1054,9 +1054,9 @@ async def trade_data_handler(data):
         #print('\n row: \n', row)
         
         ask_price_list = pd.concat([ask_price_list, row])
-        volume = ask_price_list['volume'].resample('1S').sum()
+        volume = ask_price_list['volume'].resample('10S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('1S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('10S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
 
