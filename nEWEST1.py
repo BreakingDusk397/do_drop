@@ -15,6 +15,7 @@ import pandas as pd
 from matplotlib import cm, pyplot as plt
 
 import scipy
+from scipy.optimize import curve_fit
 import yfinance as yf
 from scipy.stats.mstats import winsorize
 import pandas as pd
@@ -94,13 +95,125 @@ bid_sum_delta_vol = 10000
 ask_sum_delta_vol = 10000
 previous_df = 0
 df_orderbook = 0
+A = 1
+k = 1
+
+
+@jit(cache=True, nopython=True)
+def np_vwap(h,l,v):
+    return np.cumsum(v*(h+l)/2) / np.cumsum(v)
+
+@jit(cache=True, nopython=True)
+def d_vwap(c,v):
+    return np.cumsum(v*c) / np.cumsum(v)
+
+@jit(cache=True, nopython=True)
+def exp_decay(k,A,delta,c):
+    return A * np.exp(-k * delta) + c
+
+async def calibrate_params(symbol):
+    while True:
+        order_id_list_buy = []
+        order_id_list_sell = []
+        order_i_list_buy = []
+        order_i_list_sell = []
+        duration_buy = []
+        duration_sell = []
+
+        global A
+        global k
+
+        try:    
+            ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
+            for i in range(1,10):
+                
+
+                market_order_data = LimitOrderRequest(
+                                symbol=symbol,
+                                qty=1,
+                                side=OrderSide.BUY,
+                                type='limit',
+                                time_in_force=TimeInForce.GTC,
+                                limit_price = float(midpoint) - float(i)/100.0,
+                                #take_profit={'limit_price': round((limit_price+ (spread*take_profit_multiplier)), 2)},
+                                #stop_loss={'stop_price': round((limit_price+ (spread*loss_stop_multiplier)), 2),
+                                #'limit_price':  round((limit_price+ (spread*loss_limit_multiplier)), 2)},
+                                
+                            )
+                limit_order_data = trading_client.submit_order(market_order_data)
+                time.sleep(1)
+                order_id = limit_order_data['client_order_id']
+
+                order_id_list_buy.append(order_id)
+                order_i_list_buy.append(i)
+
+
+                
+                market_order_data = LimitOrderRequest(
+                                symbol=symbol,
+                                qty=1,
+                                side=OrderSide.SELL,
+                                type='limit',
+                                time_in_force=TimeInForce.GTC,
+                                limit_price = float(midpoint) - float(i)/100.0,
+                                #take_profit={'limit_price': round((limit_price+ (spread*take_profit_multiplier)), 2)},
+                                #stop_loss={'stop_price': round((limit_price+ (spread*loss_stop_multiplier)), 2),
+                                #'limit_price':  round((limit_price+ (spread*loss_limit_multiplier)), 2)},
+                                
+                            )
+                limit_order_data = trading_client.submit_order(market_order_data)
+                time.sleep(1)
+                order_id = limit_order_data['client_order_id']
+                
+
+                order_id_list_sell.append(order_id)
+                order_i_list_sell.append(i)
+
+            for i in order_id_list_buy:
+                order = trading_client.get_order_by_client_id(i)
+                order_begin = order['created_at']
+                order_end = order['filled_at']
+
+                duration = order_end - order_begin
+                duration_buy.append(duration)
+
+            for i in order_id_list_sell:
+                order = trading_client.get_order_by_client_id(i)
+                order_begin = order['created_at']
+                order_end = order['filled_at']
+
+                duration = order_end - order_begin
+                duration_sell.append(duration)
+
+
+            X = order_i_list_buy.reverse()
+            y = duration_buy.reverse()
+            popt, pcov = curve_fit(exp_decay, X, y, p0=(1,1,1))
+
+            X_sell = order_i_list_sell.reverse()
+            y_sell = duration_sell.reverse()
+            popt_sell, pcov_sell = curve_fit(exp_decay, X_sell, y_sell, p0=(1,1,1))
+
+            print("\n Calculated parameters for ", symbol, " buying side: ", popt)
+            print("\n Calculated parameters for ", symbol, " selling side: ", popt_sell)
+
+            calibrate_params.previous = [popt, popt_sell]
+
+        except:
+            print("\n Calibrating k, A error... \n")
+            print(traceback.format_exc()) 
+
+        await asyncio.sleep(300)
+
 
 def yf_download():
     df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
     yf_download.previous = df_orderbook # Creates a variable that stores the previous version of df_orderbook for when Yahoo denies the request
     return df_orderbook
 
-def get_pricebook():
+def get_pricebook(symbol):
+
+
     
     try:
         
@@ -164,7 +277,9 @@ def get_pricebook():
         midpoint = 999
         print(traceback.format_exc()) 
 
-    get_pricebook.previous = [ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint]
+    finally:
+
+        get_pricebook.previous = [ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint]
     
 
 
@@ -183,98 +298,92 @@ def get_orderbook(symbol):
     global midpoint_IWM
     global midpoint_AMD
 
-
     try:
-        ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook()        
-    except:
-       ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook.previous
-
-    try:
+        df_orderbook = yf_download()
+        #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)  
         symbol = symbol
         trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
-    
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
         inventory_qty = int(ORDERS[1][6])
 
-
     except:
+        df_orderbook = yf_download.previous
+        #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook.previous
 
         print("No inventory position.")
         inventory_qty = 1
         #print(traceback.format_exc())
         ask_alpha = 0.05
         bid_alpha = 0.05
+       
+    finally:
+
+        symbol = str(symbol)
         
+        #previous_df = df_orderbook.previous
+
+        df_orderbook['inventory'] = inventory_qty
+        df_orderbook["mu"] = abs((np.log(df_orderbook["Open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
+
+        df_orderbook['gamma'] = get_inventory_risk(symbol = symbol)
+
+
+        df_orderbook['sigma'] = ((np.log(df_orderbook["Open"]).rolling(15).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(15)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) * 100
+
+
+        df_orderbook['Volume'] = df_orderbook['Volume'] + 1
+
+
+        df_orderbook['k'] = k
         
+        #(0.5*(df_orderbook['sigma'])*np.sqrt(df_orderbook['Volume']/df_orderbook['Volume'].rolling(15).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))*1
+
+        df_orderbook['bid_alpha'] = A
+        df_orderbook['ask_alpha'] = A
+
+        #df_orderbook['bid_sum_delta_vol'] = bid_sum_delta_vol
+        #df_orderbook['ask_sum_delta_vol'] = ask_sum_delta_vol
+        df_orderbook['market_impact'] = 0.02 + df_orderbook['sigma']*np.sqrt(df_orderbook['inventory']/df_orderbook['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
+        
+
+        df_orderbook['bid_spread_aysm'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (2 * df_orderbook['inventory'] + 1) / 2 * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 100000)
+
+        df_orderbook['ask_spread_aysm'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) - (2 * df_orderbook['inventory'] - 1) / 2 * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 100000)
         
 
 
+        # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
+        df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 2500000)
+
+        df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 2500000)
+
+
+        df_orderbook['bid_spread_aysm3'] = 1 / df_orderbook['gamma'] * np.log( 1 + df_orderbook['gamma']/df_orderbook['k'] ) + df_orderbook['market_impact']/2 + (2 * df_orderbook['inventory'] + 1)/2 * np.exp((df_orderbook['k']/4) * df_orderbook['market_impact']) * np.sqrt( ((df_orderbook['sigma'] * 2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha'])) ( 1 + df_orderbook['gamma'] * df_orderbook['k'] )**(1+ df_orderbook['k'] * df_orderbook['gamma']) )
+
+        df_orderbook['ask_spread_aysm3'] = 1 / df_orderbook['gamma'] * np.log( 1 + df_orderbook['gamma']/df_orderbook['k'] ) + df_orderbook['market_impact']/2 - (2 * df_orderbook['inventory'] - 1)/2 * np.exp((df_orderbook['k']/4) * df_orderbook['market_impact']) * np.sqrt( ((df_orderbook['sigma'] * 2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha'])) ( 1 + df_orderbook['gamma'] * df_orderbook['k'] )**(1+ df_orderbook['k'] * df_orderbook['gamma']) )
         
+        print(df_orderbook)
+        print("\n bid: \n", symbol, df_orderbook['bid_spread_aysm2'][-1])
+        print("\n ask: \n", symbol, df_orderbook['ask_spread_aysm2'][-1])
 
-    symbol = str(symbol)
-    
-    
-    try:
-        df_orderbook = yf_download()
-    except:
-        df_orderbook = yf_download.previous
+        best_ask = df_orderbook['ask_spread_aysm2'][-1]
+        best_bid = df_orderbook['bid_spread_aysm2'][-1]
 
-    #previous_df = df_orderbook.previous
+        if symbol == 'IWM':
+            midpoint_IWM = midpoint
+            df_orderbook['midpoint_IWM'] = midpoint
 
-    df_orderbook['inventory'] = inventory_qty
-    df_orderbook["mu"] = abs((np.log(df_orderbook["Open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
+        if symbol == 'SPY':
+            midpoint_SPY = midpoint
+            df_orderbook['midpoint_SPY'] = midpoint
 
-    df_orderbook['gamma'] = get_inventory_risk(symbol = symbol)
+        if symbol == 'AMD':
+            midpoint_AMD = midpoint
+            df_orderbook['midpoint_AMD'] = midpoint
 
-
-    df_orderbook['sigma'] = ((np.log(df_orderbook["Open"]).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) * 100
-
-
-    df_orderbook['Volume'] = df_orderbook['Volume'] + 1
-
-
-    df_orderbook['k'] = (0.5*(df_orderbook['sigma'])*np.sqrt(df_orderbook['Volume']/df_orderbook['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))*1
-
-    df_orderbook['bid_alpha'] = float(bid_alpha) / 100
-    df_orderbook['ask_alpha'] = float(ask_alpha) / 100
-
-    df_orderbook['bid_sum_delta_vol'] = bid_sum_delta_vol
-    df_orderbook['ask_sum_delta_vol'] = ask_sum_delta_vol
-    
-
-    df_orderbook['bid_spread_aysm'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (2 * df_orderbook['inventory'] + 1) / 2 * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 100000)
-
-    df_orderbook['ask_spread_aysm'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) - (2 * df_orderbook['inventory'] - 1) / 2 * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 100000)
-    
-
-
-    # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
-    df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['bid_alpha']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['bid_alpha']) / (2 * df_orderbook['bid_alpha'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['bid_alpha'])**(1 + df_orderbook['bid_alpha'] / df_orderbook['gamma']))) / 2500000)
-
-    df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['ask_alpha']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['ask_alpha']) / (2 * df_orderbook['ask_alpha'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['ask_alpha'])**(1 + df_orderbook['ask_alpha'] / df_orderbook['gamma']))) / 2500000)
-
-    print(df_orderbook)
-    print("\n bid: \n", symbol, df_orderbook['bid_spread_aysm2'][-1])
-    print("\n ask: \n", symbol, df_orderbook['ask_spread_aysm2'][-1])
-
-    best_ask = df_orderbook['ask_spread_aysm2'][-1]
-    best_bid = df_orderbook['bid_spread_aysm2'][-1]
-
-    if symbol == 'IWM':
-        midpoint_IWM = midpoint
-        df_orderbook['midpoint_IWM'] = midpoint
-
-    if symbol == 'SPY':
-        midpoint_SPY = midpoint
-        df_orderbook['midpoint_SPY'] = midpoint
-
-    if symbol == 'AMD':
-        midpoint_AMD = midpoint
-        df_orderbook['midpoint_AMD'] = midpoint
-
-    elapsed_time = time.process_time() - t
-    print('\n Time to ordebook method: \n', elapsed_time)
+        elapsed_time = time.process_time() - t
+        print('\n Time to ordebook method: \n', elapsed_time)
 
     return best_bid, best_ask, midpoint, df_orderbook, inventory_qty
 
@@ -312,38 +421,15 @@ def get_inventory_risk(symbol):
         ORDERS = pd.DataFrame(position)
 
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.10:
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
-
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.12:
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
-        
-        if float(ORDERS[1][12]) >=  3:
-            
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
-            
-
-        if float(ORDERS[1][12]) <=  -13:
-
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
-
 
 
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "IWM":
-            inventory_risk = 0.002 * abs(inventory_qty)
+            inventory_risk = 0.02 / abs(inventory_qty)
 
         if symbol == 'SPY':
-            inventory_risk = 0.002 * abs(inventory_qty)
+            inventory_risk = 0.02 / abs(inventory_qty)
 
     except:
 
@@ -367,29 +453,6 @@ def get_open_position(symbol):
     
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
-
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.10:
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
-
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.12:
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
-        
-        if float(ORDERS[1][12]) >=  3:
-            
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
-            
-
-        if float(ORDERS[1][12]) <=  -13:
-
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
     
         inventory_qty = int(ORDERS[1][6])
 
@@ -406,191 +469,109 @@ def get_open_position(symbol):
 
 
 
-def take_profit_method(symbol):
-    try:
-            
-        symbol = symbol
-        trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
-        position = trading_client.get_open_position(symbol)
-        ORDERS = pd.DataFrame(position)
+async def take_profit_method(symbol):
+    while True:
+        try:
+                
+            symbol = symbol
+            trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+            position = trading_client.get_open_position(symbol)
+            ORDERS = pd.DataFrame(position)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.10:
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
+            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.05:
+                cancel_orders_for_symbol(symbol=symbol)
+                
+                trading_client.close_position(symbol)
 
-        if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.12:
-            cancel_orders_for_symbol(symbol=symbol)
+            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.12:
+                cancel_orders_for_symbol(symbol=symbol)
+                
+                trading_client.close_position(symbol)
             
-            trading_client.close_position(symbol)
+            if float(ORDERS[1][12]) >=  4:
+                
+                cancel_orders_for_symbol(symbol=symbol)
+                
+                trading_client.close_position(symbol)
+                
+
+            if float(ORDERS[1][12]) <=  -13:
+
+                cancel_orders_for_symbol(symbol=symbol)
+                
+                trading_client.close_position(symbol)
+                
+            """
+            elif str(ORDERS[1][7]) ==  "PositionSide.LONG":
+
+                if float(ORDERS[1][5]) - float(ORDERS[1][14]) <= -0.1:
+                    cancel_orders_for_symbol(symbol=symbol)
+                    
+                    trading_client.close_position(symbol)
+                    
+
+                if float(ORDERS[1][5]) - float(ORDERS[1][14]) >= 0.1:
+                    cancel_orders_for_symbol(symbol=symbol)
+                    
+                    trading_client.close_position(symbol)
+                    
+
+
+            elif str(ORDERS[1][7]) ==  "PositionSide.SHORT":
+
+                if float(ORDERS[1][5]) - float(ORDERS[1][14]) >= 0.1:
+                    cancel_orders_for_symbol(symbol=symbol)
+                    
+                    trading_client.close_position(symbol)
+                    
+
+                if float(ORDERS[1][5]) - float(ORDERS[1][14]) <= -0.1:
+                    cancel_orders_for_symbol(symbol=symbol)
+                    
+                    trading_client.close_position(symbol)"""
+                    
+
+        except:
+            print ("take_profit_method error.")
+            #print(traceback.format_exc())
+
+        finally:
         
-        if float(ORDERS[1][12]) >=  3:
-            
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
-            
-
-        if float(ORDERS[1][12]) <=  -13:
-
-            cancel_orders_for_symbol(symbol=symbol)
-            
-            trading_client.close_position(symbol)
-            
-        """
-        elif str(ORDERS[1][7]) ==  "PositionSide.LONG":
-
-            if float(ORDERS[1][5]) - float(ORDERS[1][14]) <= -0.1:
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-                
-
-            if float(ORDERS[1][5]) - float(ORDERS[1][14]) >= 0.1:
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-                
-
-
-        elif str(ORDERS[1][7]) ==  "PositionSide.SHORT":
-
-            if float(ORDERS[1][5]) - float(ORDERS[1][14]) >= 0.1:
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-                
-
-            if float(ORDERS[1][5]) - float(ORDERS[1][14]) <= -0.1:
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)"""
-                
-
-    except:
-        print ("take_profit_method error.")
-        #print(traceback.format_exc())
-        
+            await asyncio.sleep(5)
 
 
 
 
 
+order_list = []
 
-@jit(cache=True)
-def limit_order(symbol, spread, side, take_profit_multiplier, loss_stop_multiplier, loss_limit_multiplier, qty, inventory_risk):
-    
+def limit_order(symbol, limit_price, side, take_profit, stop_loss, stop_loss_limit, qty, inventory_risk):
+    global order_list
     symbol = str(symbol)
-    best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
-
-    dataset = df
-
-
-    dataset['spread'] = abs(np.log(dataset['Open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - ((np.log(dataset['Low']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + np.log(dataset['High']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/2))
-    dataset['variance'] = (np.log(dataset['Open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-    current_variance = (dataset["variance"][-1])
-    current_spread = (dataset["spread"][-1])
-    current_variance = float(current_variance) * 1000
-    current_spread = float(current_spread) * 1000
-
-
     
-    now = datetime.now()
-
-    end_of_day = datetime(now.year, now.month, now.day, hour=22)
-
-
-
-
-    steps_in_day = end_of_day - now
-    steps_in_day = float(round(steps_in_day.total_seconds()/60))
-    #steps_in_day = 100
-    #mid_price = float(current_price)
-
-    if symbol == 'IWM':
-        midpoint = midpoint_IWM
-
-    if symbol == 'SPY':
-        midpoint = midpoint_SPY
-
-    if symbol == 'AMD':
-        midpoint = midpoint_AMD
-
-    mid_price = (float(midpoint))
-                 #+ float(df['Open'][-1])) / 2
-
-    inventory = float(inventory_qty)
-    inventory_risk = float(inventory_risk)
-    variance = float(current_variance)
-    total_steps_in_day = float(420)
-    #print(steps_in_day)
-    print("\n inventory: \n", inventory)
-
-    
-
-    res = np.array(mid_price) - ((np.array(inventory) * np.array(inventory_risk) * (np.array(variance)) * (1 - (np.array(steps_in_day, dtype='float64')/np.array(total_steps_in_day))))/40)
-    #np.array(current_spread
-    print("\n reservation price: \n", res)
-    print("\n reservation price delta: \n", res-mid_price)
-
-    
-
-
-    
-
-    #cancel_orders_for_symbol(symbol)
-    
-    best_spread = 0.0001
-
-    
-
-    print("\n midpoint: \n", midpoint)
-
-
-
-    if side == 'OrderSide.BUY':
-        cancel_orders_for_side(symbol=symbol, side='sell')
-        best_spread = best_bid
-        if float(best_spread) > -0.01:
-            best_spread = best_spread + -0.05
-
-        stop_loss = res - (best_spread * 3)
-        take_profit = res + (best_spread * 3)
-
-    if side == 'OrderSide.SELL':
-        cancel_orders_for_side(symbol=symbol, side='buy')
-        best_spread = best_ask
-        
-        if float(best_spread) < 0.01:
-            best_spread = best_spread + 0.05
-
-        stop_loss = res + (best_spread * 3)
-        take_profit = res - (best_spread * 3)
-
-    spread = best_spread
-    current_price = res
-    limit_price = round(current_price + spread, 2)
-
-
-    #current_price = yf.download(symbol, period="1d", interval="1m")
-    #current_price = float(current_price["Open"][-1:])
-
     market_order_data = LimitOrderRequest(
                     symbol=symbol,
                     qty=int(qty),
                     side=side,
-                    type='limit',
+                    type='bracket',
                     time_in_force=TimeInForce.GTC,
                     limit_price = limit_price,
-                    #take_profit={'limit_price': round((limit_price+ (spread*take_profit_multiplier)), 2)},
-                    #stop_loss={'stop_price': round((limit_price+ (spread*loss_stop_multiplier)), 2),
-                    #'limit_price':  round((limit_price+ (spread*loss_limit_multiplier)), 2)},
+                    take_profit={'limit_price': round(take_profit, 2)},
+                    stop_loss={'stop_price': round((stop_loss), 2),
+                    'limit_price':  round((stop_loss_limit), 2)},
                     
                 )
     limit_order_data = trading_client.submit_order(market_order_data)
 
+    order_id = limit_order_data['client_order_id']
+                
+
+    order_list.append(order_id)
+
     #print("spread, limit_price: ", spread, limit_price)
     #print(limit_order_data)
+
+
 
 
             
@@ -715,6 +696,16 @@ def metric(y_true, y_pred):
     cm_display.plot()
     plt.show()"""
 
+@jit(cache=True, nopython=True)
+def calculateMahalanobis(y=None, data=None, cov=None): 
+  
+    y_mu = y - np.mean(data) 
+    if not cov: 
+        cov = np.cov(data.values.T) 
+    inv_covmat = np.linalg.inv(cov) 
+    left = np.dot(y_mu, inv_covmat) 
+    mahal = np.dot(left, y_mu.T) 
+    return mahal.diagonal() 
 
 @jit(cache=True, nopython=True)
 def std_normalized(vals):
@@ -748,8 +739,11 @@ def make_model(dataset, symbol, side):
 
         symbol = str(symbol)
         get_time_til_close(symbol=symbol)
-        take_profit_method(symbol=symbol)
+        #take_profit_method(symbol=symbol)
 
+        best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
+
+        dataset = pd.merge(left=dataset, right=df, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
 
         column_price = 'open'
@@ -785,13 +779,29 @@ def make_model(dataset, symbol, side):
 
 
 
-    
+        
 
-        dataset['spread'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
+
+
+
+        dataset['spread'] = abs(np.log(dataset['Open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - ((np.log(dataset['Low']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + np.log(dataset['High']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/2))
+        dataset['variance'] = (np.log(dataset['Open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        current_variance = (dataset["variance"][-1])
+        current_spread = (dataset["spread"][-1])
+        current_variance = float(current_variance) * 1000
+        current_spread = float(current_spread) * 1000
+        dataset['best_bid2'] = best_bid
+        dataset['best_ask2'] = best_ask
+        dataset['inventory_qty2'] = inventory_qty
+        
+
+        dataset['spread3'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
         dataset['Volatility'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
         dataset['Volatility2'] = (np.log(dataset['Volatility']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
-        #
+        dataset['Volatility3'] = (np.log(dataset['open']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
+        dataset['Volatility4'] = (np.log(dataset['Volatility3']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
+        dataset['Volatility_ratio'] = dataset['Volatility'] / dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
 
         
         dataset['last_return'] = np.log(dataset["open"]).pct_change()
@@ -800,8 +810,14 @@ def make_model(dataset, symbol, side):
         #dataset['price_deviation'] = np.log(dataset[column_price]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
         #dataset['volume_deviation'] = np.log(dataset[column_volume]).rolling(volume_deviation_period).apply(values_deviation)
         dataset['OBV'] = stats.zscore((np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum())
+        dataset['OBV1'] = (np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum()
+        dataset['OBV2'] = (np.sign(dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
+        dataset['OBV3'] = (np.sign((dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
 
-        
+        dataset['vwap'] = np_vwap(h= dataset['high'],l= dataset['low'],v= dataset['volume'])
+        dataset['D_vwap'] = d_vwap(c= dataset['open'],v= dataset['volume'])
+        dataset['Mahalanobis'] = calculateMahalanobis(y=dataset, data=dataset.columns.tolist()) 
+  
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -921,7 +937,7 @@ def make_model(dataset, symbol, side):
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
-        take_profit_method(symbol)
+        #take_profit_method(symbol)
 
 
         grid = {
@@ -969,34 +985,121 @@ def make_model(dataset, symbol, side):
 
         
 
+        
+
+
+        
+        now = datetime.now()
+
+        end_of_day = datetime(now.year, now.month, now.day, hour=22)
+
+
+
+
+        steps_in_day = end_of_day - now
+        steps_in_day = float(round(steps_in_day.total_seconds()/60))
+        #steps_in_day = 100
+        #mid_price = float(current_price)
+
+        if symbol == 'IWM':
+            midpoint = midpoint_IWM
+
+        if symbol == 'SPY':
+            midpoint = midpoint_SPY
+
+        if symbol == 'AMD':
+            midpoint = midpoint_AMD
+
+        mid_price = (float(midpoint))
+                    #+ float(df['Open'][-1])) / 2
+
+        inventory = float(inventory_qty)
+        inventory_risk = float(inventory_risk)
+        variance = float(current_variance)
+        total_steps_in_day = float(420)
+        #print(steps_in_day)
+        print("\n inventory: \n", inventory)
+
+        
+
+        res = np.array(mid_price) - ((np.array(inventory) * np.array(inventory_risk) * (np.array(variance)) * (1 - (np.array(steps_in_day, dtype='float64')/np.array(total_steps_in_day))))/40)
+        #np.array(current_spread
+        print("\n reservation price: \n", res)
+        print("\n reservation price delta: \n", res-mid_price)
+
+        
+
+
+        
+
+        #cancel_orders_for_symbol(symbol)
+        
+        best_spread = 0.0001
+
+        
+
+        print("\n midpoint: \n", midpoint)
+
+
+
+        if side == 'OrderSide.BUY':
+            spread = -0.02
+            cancel_orders_for_side(symbol=symbol, side='sell')
+            best_spread = best_bid
+            if float(best_spread) > -0.01:
+                best_spread = best_spread + -0.05
+
+            stop_loss = res - (best_spread * 3)
+            stop_loss_limit = stop_loss - 0.01
+            take_profit = res + (best_spread * 3)
+
+        if side == 'OrderSide.SELL':
+            spread = 0.02
+            cancel_orders_for_side(symbol=symbol, side='buy')
+            best_spread = best_ask
+            
+            if float(best_spread) < 0.01:
+                best_spread = best_spread + 0.05
+
+            stop_loss = res + (best_spread * 3)
+            stop_loss_limit = stop_loss + 0.01
+            take_profit = res - (best_spread * 3)
+
+        spread = best_spread
+        current_price = res
+        limit_price = round(current_price + spread, 2)
+
+
+        #current_price = yf.download(symbol, period="1d", interval="1m")
+        #current_price = float(current_price["Open"][-1:])
 
 
 
         if int(CatBoost_pred) == 1:
 
             if str(side) == 'OrderSide.BUY':
-                spread = -0.02
+                
 
                 limit_order(symbol=symbol, 
-                            spread=spread, 
+                            limit_price=limit_price, 
                             side=side, 
-                            take_profit_multiplier = 2,
-                            loss_stop_multiplier = 2,
-                            loss_limit_multiplier = 2.1,
+                            take_profit = take_profit,
+                            stop_loss = stop_loss,
+                            stop_loss_limit = stop_loss_limit,
                             qty = 100,
                             inventory_risk = get_inventory_risk(symbol=symbol)
                             )
 
 
             if str(side) == 'OrderSide.SELL':
-                spread = 0.02
+                
 
                 limit_order(symbol=symbol, 
-                            spread=spread, 
+                            limit_price=limit_price, 
                             side=side, 
-                            take_profit_multiplier = 2,
-                            loss_stop_multiplier = 2,
-                            loss_limit_multiplier = 2.1,
+                            take_profit = take_profit,
+                            stop_loss = stop_loss,
+                            stop_loss_limit = stop_loss_limit,
                             qty = 100,
                             inventory_risk = get_inventory_risk(symbol=symbol)
                             )
@@ -1054,10 +1157,13 @@ async def trade_data_handler(data):
         #print('\n row: \n', row)
         
         ask_price_list = pd.concat([ask_price_list, row])
+        ask_price_list['d_vwap'] = d_vwap(ask_price_list['close'], ask_price_list['volume'])
+        d_vwap = ask_price_list['d_vwap'].resample('10S').mean()
         volume = ask_price_list['volume'].resample('10S').sum()
 
         ask_price_list3 = ask_price_list['close'].resample('10S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
+        ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
 
         ask_price_list3 = ask_price_list3.ffill()
@@ -1076,7 +1182,7 @@ async def create_model(data):
 
     t = time.process_time()
     
-    take_profit_method(symbol='IWM')
+    #take_profit_method(symbol='IWM')
     #take_profit_method(symbol='SPY')
 
     global data_out
@@ -1105,7 +1211,8 @@ async def create_model(data):
     #get_time_til_close(symbol='IWM')
     #get_time_til_close(symbol='SPY')
 
-
+asyncio.create_task(calibrate_params("IWM"))
+asyncio.create_task(take_profit_method("IWM"))
 
 wss_client.subscribe_trades(create_model, "IWM")
 
