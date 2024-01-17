@@ -1182,6 +1182,7 @@ async def create_model(data):
 
     t = time.process_time()
     
+    
     #take_profit_method(symbol='IWM')
     #take_profit_method(symbol='SPY')
 
@@ -1210,6 +1211,8 @@ async def create_model(data):
     #take_profit_method(symbol='SPY')
     #get_time_til_close(symbol='IWM')
     #get_time_til_close(symbol='SPY')
+
+loop = asyncio.get_event_loop()
 
 asyncio.create_task(calibrate_params("IWM"))
 asyncio.create_task(take_profit_method("IWM"))
