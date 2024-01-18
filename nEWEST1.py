@@ -95,15 +95,18 @@ bid_sum_delta_vol = 10000
 ask_sum_delta_vol = 10000
 previous_df = 0
 df_orderbook = 0
-A = 1
-k = 1
+a = 0.5
+k = 0.5
+dataset = pd.DataFrame()
+df = pd.DataFrame()
+data_in = pd.DataFrame()
+data_out = pd.DataFrame()
 
-
-@jit(cache=True, nopython=True)
+@jit(cache=True)
 def np_vwap(h,l,v):
     return np.cumsum(v*(h+l)/2) / np.cumsum(v)
 
-@jit(cache=True, nopython=True)
+@jit(cache=True)
 def d_vwap(c,v):
     return np.cumsum(v*c) / np.cumsum(v)
 
@@ -120,7 +123,7 @@ async def calibrate_params(symbol):
         duration_buy = []
         duration_sell = []
 
-        global A
+        global a
         global k
 
         try:    
@@ -286,20 +289,15 @@ def get_pricebook(symbol):
     return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
 
 
-def get_orderbook(symbol):
+def get_inventory(symbol):
 
     t = time.process_time()
 
     
-    #take_profit_method(symbol)
     
-    
-    global midpoint_SPY
-    global midpoint_IWM
-    global midpoint_AMD
 
     try:
-        df_orderbook = yf_download()
+        #df_orderbook = yf_download()
         #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)  
         symbol = symbol
         trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
@@ -314,78 +312,14 @@ def get_orderbook(symbol):
         print("No inventory position.")
         inventory_qty = 1
         #print(traceback.format_exc())
-        ask_alpha = 0.05
-        bid_alpha = 0.05
-       
+
     finally:
 
-        symbol = str(symbol)
         
-        #previous_df = df_orderbook.previous
-
-        df_orderbook['inventory'] = inventory_qty
-        df_orderbook["mu"] = abs((np.log(df_orderbook["Open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
-
-        df_orderbook['gamma'] = get_inventory_risk(symbol = symbol)
-
-
-        df_orderbook['sigma'] = ((np.log(df_orderbook["Open"]).rolling(15).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(15)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) * 100
-
-
-        df_orderbook['Volume'] = df_orderbook['Volume'] + 1
-
-
-        df_orderbook['k'] = k
-        
-        #(0.5*(df_orderbook['sigma'])*np.sqrt(df_orderbook['Volume']/df_orderbook['Volume'].rolling(15).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))*1
-
-        df_orderbook['bid_alpha'] = A
-        df_orderbook['ask_alpha'] = A
-
-        #df_orderbook['bid_sum_delta_vol'] = bid_sum_delta_vol
-        #df_orderbook['ask_sum_delta_vol'] = ask_sum_delta_vol
-        df_orderbook['market_impact'] = 0.02 + df_orderbook['sigma']*np.sqrt(df_orderbook['inventory']/df_orderbook['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
-        
-
-        df_orderbook['bid_spread_aysm'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (2 * df_orderbook['inventory'] + 1) / 2 * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 100000)
-
-        df_orderbook['ask_spread_aysm'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) - (2 * df_orderbook['inventory'] - 1) / 2 * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 100000)
-        
-
-
-        # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
-        df_orderbook['bid_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (- df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) + (2 * df_orderbook['inventory'] + 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['bid_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 2500000)
-
-        df_orderbook['ask_spread_aysm2'] = ((1 / df_orderbook['gamma'] * np.log(1 + df_orderbook['gamma'] / df_orderbook['k']) + (  df_orderbook["mu"] / (df_orderbook['gamma'] * df_orderbook['sigma']**2) - (2 * df_orderbook['inventory'] - 1) / 2) * np.sqrt((df_orderbook['sigma']**2 * df_orderbook['k']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha']) * (1 + df_orderbook['gamma'] / df_orderbook['k'])**(1 + df_orderbook['k'] / df_orderbook['gamma']))) / 2500000)
-
-
-        df_orderbook['bid_spread_aysm3'] = 1 / df_orderbook['gamma'] * np.log( 1 + df_orderbook['gamma']/df_orderbook['k'] ) + df_orderbook['market_impact']/2 + (2 * df_orderbook['inventory'] + 1)/2 * np.exp((df_orderbook['k']/4) * df_orderbook['market_impact']) * np.sqrt( ((df_orderbook['sigma'] * 2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha'])) ( 1 + df_orderbook['gamma'] * df_orderbook['k'] )**(1+ df_orderbook['k'] * df_orderbook['gamma']) )
-
-        df_orderbook['ask_spread_aysm3'] = 1 / df_orderbook['gamma'] * np.log( 1 + df_orderbook['gamma']/df_orderbook['k'] ) + df_orderbook['market_impact']/2 - (2 * df_orderbook['inventory'] - 1)/2 * np.exp((df_orderbook['k']/4) * df_orderbook['market_impact']) * np.sqrt( ((df_orderbook['sigma'] * 2 * df_orderbook['gamma']) / (2 * df_orderbook['k'] * df_orderbook['ask_alpha'])) ( 1 + df_orderbook['gamma'] * df_orderbook['k'] )**(1+ df_orderbook['k'] * df_orderbook['gamma']) )
-        
-        print(df_orderbook)
-        print("\n bid: \n", symbol, df_orderbook['bid_spread_aysm2'][-1])
-        print("\n ask: \n", symbol, df_orderbook['ask_spread_aysm2'][-1])
-
-        best_ask = df_orderbook['ask_spread_aysm2'][-1]
-        best_bid = df_orderbook['bid_spread_aysm2'][-1]
-
-        if symbol == 'IWM':
-            midpoint_IWM = midpoint
-            df_orderbook['midpoint_IWM'] = midpoint
-
-        if symbol == 'SPY':
-            midpoint_SPY = midpoint
-            df_orderbook['midpoint_SPY'] = midpoint
-
-        if symbol == 'AMD':
-            midpoint_AMD = midpoint
-            df_orderbook['midpoint_AMD'] = midpoint
-
         elapsed_time = time.process_time() - t
         print('\n Time to ordebook method: \n', elapsed_time)
 
-    return best_bid, best_ask, midpoint, df_orderbook, inventory_qty
+    return inventory_qty
 
 
 
@@ -644,8 +578,7 @@ def match_orders_for_symbol(symbol):
         #print('\n ORDERS: \n',ORDERS)
         side = str(ORDERS[1][7])
         qty = float(ORDERS[1][20])
-        best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
-
+        
 
         if str(side) == 'PositionSide.SHORT':
 
@@ -696,16 +629,6 @@ def metric(y_true, y_pred):
     cm_display.plot()
     plt.show()"""
 
-@jit(cache=True, nopython=True)
-def calculateMahalanobis(y=None, data=None, cov=None): 
-  
-    y_mu = y - np.mean(data) 
-    if not cov: 
-        cov = np.cov(data.values.T) 
-    inv_covmat = np.linalg.inv(cov) 
-    left = np.dot(y_mu, inv_covmat) 
-    mahal = np.dot(left, y_mu.T) 
-    return mahal.diagonal() 
 
 @jit(cache=True, nopython=True)
 def std_normalized(vals):
@@ -741,9 +664,9 @@ def make_model(dataset, symbol, side):
         get_time_til_close(symbol=symbol)
         #take_profit_method(symbol=symbol)
 
-        best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
+        #best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
+        #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
 
-        dataset = pd.merge(left=dataset, right=df, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
 
         column_price = 'open'
@@ -782,18 +705,72 @@ def make_model(dataset, symbol, side):
         
 
 
+        ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol
+        dataset['ask_alpha'] = ask_alpha
+        dataset['bid_alpha'] = bid_alpha
+        dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
+        dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
 
-
-        dataset['spread'] = abs(np.log(dataset['Open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - ((np.log(dataset['Low']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + np.log(dataset['High']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/2))
-        dataset['variance'] = (np.log(dataset['Open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['spread'] = abs(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - ((np.log(dataset['low']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + np.log(dataset['high']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/2))
+        dataset['variance'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         current_variance = (dataset["variance"][-1])
         current_spread = (dataset["spread"][-1])
         current_variance = float(current_variance) * 1000
         current_spread = float(current_spread) * 1000
-        dataset['best_bid2'] = best_bid
-        dataset['best_ask2'] = best_ask
-        dataset['inventory_qty2'] = inventory_qty
+        #dataset['best_bid2'] = best_bid
+        #dataset['best_ask2'] = best_ask
+        #dataset['inventory_qty2'] = inventory_qty
         
+
+        dataset['inventory'] = get_inventory(symbol)
+        dataset["mu"] = abs((np.log(dataset["open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
+
+        dataset['gamma'] = get_inventory_risk(symbol = symbol)
+
+
+        dataset['sigma'] = ((np.log(dataset["open"]).rolling(15).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(15)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) * 100
+
+
+        dataset['Volume'] = dataset['volume'] + 1
+
+
+        dataset['k'] = k
+        
+        #(0.5*(dataset['sigma'])*np.sqrt(dataset['Volume']/dataset['Volume'].rolling(15).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))*1
+
+        dataset['bid_alpha'] = a
+        dataset['ask_alpha'] = a
+
+        #dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
+        #dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
+        dataset['market_impact'] = 0.02 + dataset['sigma']*np.sqrt(dataset['inventory']/dataset['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
+        
+
+        dataset['bid_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (2 * dataset['inventory'] + 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
+
+        dataset['ask_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) - (2 * dataset['inventory'] - 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
+        
+
+
+        # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
+        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 2500000)
+
+        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 2500000)
+
+
+        #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
+
+        #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
+        
+        print(dataset)
+        print("\n bid: \n", symbol, dataset['bid_spread_aysm2'][-1])
+        print("\n ask: \n", symbol, dataset['ask_spread_aysm2'][-1])
+
+        best_ask = dataset['ask_spread_aysm2'][-1]
+        best_bid = dataset['bid_spread_aysm2'][-1]
+
+
+
 
         dataset['spread3'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
@@ -816,7 +793,7 @@ def make_model(dataset, symbol, side):
 
         dataset['vwap'] = np_vwap(h= dataset['high'],l= dataset['low'],v= dataset['volume'])
         dataset['D_vwap'] = d_vwap(c= dataset['open'],v= dataset['volume'])
-        dataset['Mahalanobis'] = calculateMahalanobis(y=dataset, data=dataset.columns.tolist()) 
+
   
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
@@ -1014,7 +991,7 @@ def make_model(dataset, symbol, side):
                     #+ float(df['Open'][-1])) / 2
 
         inventory = float(inventory_qty)
-        inventory_risk = float(inventory_risk)
+        inventory_risk = float(get_inventory_risk(symbol))
         variance = float(current_variance)
         total_steps_in_day = float(420)
         #print(steps_in_day)
@@ -1046,24 +1023,26 @@ def make_model(dataset, symbol, side):
             spread = -0.02
             cancel_orders_for_side(symbol=symbol, side='sell')
             best_spread = best_bid
-            if float(best_spread) > -0.01:
-                best_spread = best_spread + -0.05
-
             stop_loss = res - (best_spread * 3)
             stop_loss_limit = stop_loss - 0.01
             take_profit = res + (best_spread * 3)
+            if float(best_spread) > -0.01:
+                best_spread = best_spread + -0.05
+
+            
 
         if side == 'OrderSide.SELL':
             spread = 0.02
             cancel_orders_for_side(symbol=symbol, side='buy')
             best_spread = best_ask
+            stop_loss = res + (best_spread * 3)
+            stop_loss_limit = stop_loss + 0.01
+            take_profit = res - (best_spread * 3)
             
             if float(best_spread) < 0.01:
                 best_spread = best_spread + 0.05
 
-            stop_loss = res + (best_spread * 3)
-            stop_loss_limit = stop_loss + 0.01
-            take_profit = res - (best_spread * 3)
+            
 
         spread = best_spread
         current_price = res
@@ -1158,12 +1137,12 @@ async def trade_data_handler(data):
         
         ask_price_list = pd.concat([ask_price_list, row])
         ask_price_list['d_vwap'] = d_vwap(ask_price_list['close'], ask_price_list['volume'])
-        d_vwap = ask_price_list['d_vwap'].resample('10S').mean()
+        d_vwap1 = ask_price_list['d_vwap'].resample('10S').mean()
         volume = ask_price_list['volume'].resample('10S').sum()
 
         ask_price_list3 = ask_price_list['close'].resample('10S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-        ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
+        ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
 
         ask_price_list3 = ask_price_list3.ffill()
@@ -1176,7 +1155,7 @@ async def trade_data_handler(data):
 
 
             
-data_out = pd.DataFrame()
+
 
 async def create_model(data):
 
@@ -1188,7 +1167,12 @@ async def create_model(data):
 
     global data_out
 
+    data_in = pd.DataFrame()
+
     data_in = await trade_data_handler(data)
+
+    print(type(data_in))
+    print(type(data_out))
 
 
     data_out = pd.merge(left=data_in, right=data_out, left_index=True, right_index=True, how='outer', suffixes=('', '_y'))
@@ -1212,17 +1196,17 @@ async def create_model(data):
     #get_time_til_close(symbol='IWM')
     #get_time_til_close(symbol='SPY')
 
-loop = asyncio.get_event_loop()
 
-asyncio.create_task(calibrate_params("IWM"))
-asyncio.create_task(take_profit_method("IWM"))
 
-wss_client.subscribe_trades(create_model, "IWM")
+
+
+wss_client.subscribe_quotes(create_model, "IWM")
 
 wss_client.run()
 
 
-
+asyncio.create_task(calibrate_params("IWM"))
+asyncio.create_task(take_profit_method("IWM"))
 
 
 """
