@@ -762,7 +762,7 @@ def make_model(dataset, symbol, side):
 
         #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
         
-        print(dataset)
+        #print(dataset)
         print("\n bid: \n", symbol, dataset['bid_spread_aysm2'][-1])
         print("\n ask: \n", symbol, dataset['ask_spread_aysm2'][-1])
 
@@ -1190,8 +1190,8 @@ async def create_model(data):
 
     data_in = await trade_data_handler(data)
 
-    print(type(data_in))
-    print(type(data_out))
+    #print(type(data_in))
+    #print(type(data_out))
 
 
     data_out = pd.merge(left=data_in, right=data_out, left_index=True, right_index=True, how='outer', suffixes=('', '_y'))
