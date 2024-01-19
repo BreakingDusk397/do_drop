@@ -1137,10 +1137,10 @@ async def trade_data_handler(data):
         
         ask_price_list = pd.concat([ask_price_list, row])
         ask_price_list['d_vwap'] = d_vwap(ask_price_list['close'], ask_price_list['volume'])
-        d_vwap1 = ask_price_list['d_vwap'].resample('10S').mean()
-        volume = ask_price_list['volume'].resample('10S').sum()
+        d_vwap1 = ask_price_list['d_vwap'].resample('5S').mean()
+        volume = ask_price_list['volume'].resample('5S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('10S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('5S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
@@ -1200,7 +1200,7 @@ async def create_model(data):
 
 
 
-wss_client.subscribe_quotes(create_model, "IWM")
+wss_client.subscribe_trades(create_model, "IWM")
 
 wss_client.run()
 
