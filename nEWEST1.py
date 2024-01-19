@@ -665,7 +665,7 @@ def make_model(dataset, symbol, side):
         #take_profit_method(symbol=symbol)
 
         #best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
-        #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
+        ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
 
 
 
@@ -705,7 +705,7 @@ def make_model(dataset, symbol, side):
         
 
 
-        ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol
+        
         dataset['ask_alpha'] = ask_alpha
         dataset['bid_alpha'] = bid_alpha
         dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
@@ -753,9 +753,9 @@ def make_model(dataset, symbol, side):
 
 
         # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
-        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 2500000)
+        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
 
-        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 2500000)
+        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
 
 
         #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
@@ -910,7 +910,7 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=20, steps=3, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
+        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=20, steps=4, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
@@ -937,7 +937,7 @@ def make_model(dataset, symbol, side):
             
         }
         tscv = TimeSeriesSplit(n_splits=5, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=4, min_resources=1, max_resources=30, cv=tscv, verbose=1, scoring='f1_weighted')
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=3, min_resources=1, max_resources=35, cv=tscv, verbose=1, scoring='f1_weighted')
 
         rscv.fit(X_test2, y_test2)
 
@@ -1057,6 +1057,16 @@ def make_model(dataset, symbol, side):
         if int(CatBoost_pred) == 1:
 
             if str(side) == 'OrderSide.BUY':
+
+                spread = -0.02
+                cancel_orders_for_side(symbol=symbol, side='sell')
+                best_spread = best_bid
+                stop_loss = res - (best_spread * 3)
+                stop_loss_limit = stop_loss - 0.01
+                take_profit = res + (best_spread * 3)
+                if float(best_spread) > -0.01:
+                    best_spread = best_spread + -0.05
+
                 
 
                 limit_order(symbol=symbol, 
@@ -1072,6 +1082,15 @@ def make_model(dataset, symbol, side):
 
             if str(side) == 'OrderSide.SELL':
                 
+                spread = 0.02
+                cancel_orders_for_side(symbol=symbol, side='buy')
+                best_spread = best_ask
+                stop_loss = res + (best_spread * 3)
+                stop_loss_limit = stop_loss + 0.01
+                take_profit = res - (best_spread * 3)
+                
+                if float(best_spread) < 0.01:
+                    best_spread = best_spread + 0.05
 
                 limit_order(symbol=symbol, 
                             limit_price=limit_price, 
