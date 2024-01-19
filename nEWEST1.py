@@ -987,7 +987,7 @@ def make_model(dataset, symbol, side):
         if symbol == 'AMD':
             midpoint = midpoint_AMD
 
-        mid_price = (float(midpoint))
+        mid_price = (float(df['close'][-1]))
                     #+ float(df['Open'][-1])) / 2
 
         inventory = float(inventory_qty)
