@@ -200,7 +200,7 @@ async def calibrate_params(symbol):
             print("\n Calculated parameters for ", symbol, " buying side: ", popt)
             print("\n Calculated parameters for ", symbol, " selling side: ", popt_sell)
 
-            calibrate_params.previous = [popt, popt_sell]
+            calibrate_params_previous = [popt, popt_sell]
 
         except:
             print("\n Calibrating k, A error... \n")
@@ -211,7 +211,7 @@ async def calibrate_params(symbol):
 
 def yf_download():
     df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
-    yf_download.previous = df_orderbook # Creates a variable that stores the previous version of df_orderbook for when Yahoo denies the request
+    #yf_download_previous = df_orderbook  #Creates a variable that stores the previous version of df_orderbook for when Yahoo denies the request
     return df_orderbook
 
 def get_pricebook(symbol):
@@ -282,7 +282,7 @@ def get_pricebook(symbol):
 
     finally:
 
-        get_pricebook.previous = [ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint]
+        get_pricebook_previous = [ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint]
     
 
 
@@ -306,7 +306,7 @@ def get_inventory(symbol):
         inventory_qty = int(ORDERS[1][6])
 
     except:
-        df_orderbook = yf_download.previous
+        #df_orderbook = yf_download_previous
         #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook.previous
 
         print("No inventory position.")
