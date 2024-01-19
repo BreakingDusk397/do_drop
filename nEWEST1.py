@@ -1067,6 +1067,10 @@ def make_model(dataset, symbol, side):
                 if float(best_spread) > -0.01:
                     best_spread = best_spread + -0.05
 
+                spread = best_spread
+                current_price = res
+                limit_price = round(current_price + spread, 2)
+
                 
 
                 limit_order(symbol=symbol, 
@@ -1091,6 +1095,10 @@ def make_model(dataset, symbol, side):
                 
                 if float(best_spread) < 0.01:
                     best_spread = best_spread + 0.05
+
+                spread = best_spread
+                current_price = res
+                limit_price = round(current_price + spread, 2)
 
                 limit_order(symbol=symbol, 
                             limit_price=limit_price, 
