@@ -721,7 +721,7 @@ def make_model(dataset, symbol, side):
         #dataset['best_ask2'] = best_ask
         #dataset['inventory_qty2'] = inventory_qty
         
-
+        mid_price = (float(dataset['close'][-1]))
         dataset['inventory'] = get_inventory(symbol)
         dataset["mu"] = abs((np.log(dataset["open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
 
@@ -987,7 +987,7 @@ def make_model(dataset, symbol, side):
         if symbol == 'AMD':
             midpoint = midpoint_AMD
 
-        mid_price = (float(dataset['close'][-1]))
+        
                     #+ float(df['Open'][-1])) / 2
 
         inventory = float(inventory_qty)
