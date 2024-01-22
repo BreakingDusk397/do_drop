@@ -90,6 +90,12 @@ dataset = pd.DataFrame()
 df = pd.DataFrame()
 data_in = pd.DataFrame()
 data_out = pd.DataFrame()
+future_period = 2
+future_period1 = 10
+std_period = 15
+ma_period = 15
+price_deviation_period = 15
+volume_deviation_period = 15
 
 symbol = "IWM"
 BASE_URL = "https://paper-api.alpaca.markets"
@@ -811,14 +817,7 @@ def make_model(dataset, symbol, side):
 
 
         # Feature params
-        future_period = 2
-
-
-        future_period1 = 10
-        std_period = 15
-        ma_period = 15
-        price_deviation_period = 15
-        volume_deviation_period = 15
+        
 
 
         
