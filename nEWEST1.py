@@ -819,7 +819,7 @@ def make_model(dataset, symbol, side):
         # Feature params
         
 
-        mid_price = (float(dataset['close'][-1]))
+        mid_price = (float(dataset['d_vwap'][-1]))
         
         dataset['future_return'] = dataset['open'].pct_change(future_period).shift(-future_period)
         #print(dataset['future_return'])
@@ -992,7 +992,7 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=25, steps=4, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
+        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=25, steps=5, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
