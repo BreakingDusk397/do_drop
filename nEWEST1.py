@@ -188,7 +188,7 @@ async def calibrate_params(symbol):
                                 side=OrderSide.BUY,
                                 type='limit',
                                 time_in_force=TimeInForce.GTC,
-                                limit_price = float(midpoint) - float(i)/100.0,
+                                limit_price = round((float(midpoint) - float(i)/100.0), 2),
                                 #take_profit={'limit_price': round((limit_price+ (spread*take_profit_multiplier)), 2)},
                                 #stop_loss={'stop_price': round((limit_price+ (spread*loss_stop_multiplier)), 2),
                                 #'limit_price':  round((limit_price+ (spread*loss_limit_multiplier)), 2)},
@@ -209,7 +209,7 @@ async def calibrate_params(symbol):
                                 side=OrderSide.SELL,
                                 type='limit',
                                 time_in_force=TimeInForce.GTC,
-                                limit_price = float(midpoint) - float(i)/100.0,
+                                limit_price = round((float(midpoint) + float(i)/100.0), 2),
                                 #take_profit={'limit_price': round((limit_price+ (spread*take_profit_multiplier)), 2)},
                                 #stop_loss={'stop_price': round((limit_price+ (spread*loss_stop_multiplier)), 2),
                                 #'limit_price':  round((limit_price+ (spread*loss_limit_multiplier)), 2)},
@@ -807,7 +807,7 @@ def make_model(dataset, symbol, side):
 
         symbol = str(symbol)
         get_time_til_close(symbol=symbol)
-        #take_profit_method(symbol=symbol)
+
 
         #best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
         ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
@@ -996,7 +996,7 @@ def make_model(dataset, symbol, side):
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
-        #take_profit_method(symbol)
+
 
 
         grid = {
@@ -1102,8 +1102,7 @@ def make_model(dataset, symbol, side):
                             inventory_risk = get_inventory_risk(symbol=symbol)
                             )
                 
-        #take_profit_method(symbol)
-        #match_orders_for_symbol(symbol=symbol)
+
         t1 = time.time()
         total = t1-t0
         print('\n Total time to order: \n', total)
@@ -1134,8 +1133,7 @@ async def trade_data_handler(data):
     t = time.process_time()
 
     
-    #take_profit_method(symbol='IWM')
-    #take_profit_method(symbol='SPY')
+
     #print('\n Raw Data: \n', data)
     df = pd.DataFrame(data)
 
@@ -1181,8 +1179,11 @@ async def create_model(data):
     t = time.process_time()
     
     
-    #take_profit_method(symbol='IWM')
-    #take_profit_method(symbol='SPY')
+
+
+    asyncio.gather(calibrate_params("IWM"))
+    asyncio.gather(take_profit_method("IWM"))
+
 
     global data_out
 
@@ -1217,8 +1218,6 @@ async def create_model(data):
 
 
 
-asyncio.create_task(calibrate_params("IWM"))
-asyncio.create_task(take_profit_method("IWM"))
 
 wss_client.subscribe_trades(create_model, "IWM")
 
