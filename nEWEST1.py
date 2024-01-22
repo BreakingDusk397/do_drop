@@ -1124,8 +1124,8 @@ def make_model(dataset, symbol, side):
 
 from alpaca.data.live import StockDataStream, CryptoDataStream
 
-API_KEY = "PKBX5XZQ1JG2CEODIOKD"
-SECRET_KEY = "laKd5n4c7pnjRT9nC6WJztVEWruDz2b1VDJab5Hg"
+API_KEY = "PKCSSHRBEDBBETRCTIC0"
+SECRET_KEY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
 wss_client = StockDataStream(API_KEY, SECRET_KEY)
 
 now = datetime.now()
