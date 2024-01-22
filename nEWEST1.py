@@ -66,7 +66,10 @@ print(datetime.now())
 
 
 
-
+column_price = 'open'
+column_high = 'high'
+column_low = 'low'
+column_volume = 'volume'
 
 midpoint_SPY = 0
 midpoint_IWM = 0
@@ -803,12 +806,6 @@ def make_model(dataset, symbol, side):
         #best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
         ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
 
-
-
-        column_price = 'open'
-        column_high = 'high'
-        column_low = 'low'
-        column_volume = 'volume'
 
         
 
