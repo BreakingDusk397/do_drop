@@ -66,21 +66,7 @@ print(datetime.now())
 
 
 
-symbol = "IWM"
-BASE_URL = "https://paper-api.alpaca.markets"
-API_KEY = "PKBX5XZQ1JG2CEODIOKD"
-SECRET_KEY = "laKd5n4c7pnjRT9nC6WJztVEWruDz2b1VDJab5Hg"
 
-trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
-
-symbol = symbol
-totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
-#print("Current OTP:", totp)
-
-username = "torndoff@icloud.com"
-password = "qu2t3f8Ew9BxM"
-
-login = r.login(username,password, mfa_code=totp)
 
 midpoint_SPY = 0
 midpoint_IWM = 0
@@ -101,6 +87,63 @@ dataset = pd.DataFrame()
 df = pd.DataFrame()
 data_in = pd.DataFrame()
 data_out = pd.DataFrame()
+
+symbol = "IWM"
+BASE_URL = "https://paper-api.alpaca.markets"
+API_KEY = "PKCSSHRBEDBBETRCTIC0"
+SECRET_KEY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
+
+trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+
+symbol = symbol
+totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
+#print("Current OTP:", totp)
+
+username = "torndoff@icloud.com"
+password = "qu2t3f8Ew9BxM"
+
+login = r.login(username,password, mfa_code=totp)
+
+ get a massive speed up of Bill's answer by using numba. 100 loops of 20k row series( regular = 113 seconds, numba = 0.28 seconds ). Numba excels with loops and arithmetic.
+
+import numpy as np
+import numba as nb
+
+@nb.jit(fastmath=True, nopython=True)   
+def calc_rsi( array, deltas, avg_gain, avg_loss, n ):
+
+    # Use Wilder smoothing method
+    up   = lambda x:  x if x > 0 else 0
+    down = lambda x: -x if x < 0 else 0
+    i = n+1
+    for d in deltas[n+1:]:
+        avg_gain = ((avg_gain * (n-1)) + up(d)) / n
+        avg_loss = ((avg_loss * (n-1)) + down(d)) / n
+        if avg_loss != 0:
+            rs = avg_gain / avg_loss
+            array[i] = 100 - (100 / (1 + rs))
+        else:
+            array[i] = 100
+        i += 1
+
+    return array
+
+def get_rsi( array, n = 14 ):   
+
+    deltas = np.append([0],np.diff(array))
+
+    avg_gain =  np.sum(deltas[1:n+1].clip(min=0)) / n
+    avg_loss = -np.sum(deltas[1:n+1].clip(max=0)) / n
+
+    array = np.empty(deltas.shape[0])
+    array.fill(np.nan)
+
+    array = calc_rsi( array, deltas, avg_gain, avg_loss, n )
+    return array
+
+
+
+
 
 @jit(cache=True)
 def np_vwap(h,l,v):
@@ -655,6 +698,100 @@ def z_score_df(df):
     df = df.apply(lambda x : z_score(x))
     return df
 
+@jit(cache=True)
+def create_features(dataset):
+
+        dataset['spread'] = abs(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - ((np.log(dataset['low']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + np.log(dataset['high']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/2))
+        dataset['variance'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+
+        dataset['inventory'] = get_inventory(symbol)
+        dataset["mu"] = abs((np.log(dataset["open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
+
+        dataset['gamma'] = get_inventory_risk(symbol = symbol)
+
+
+        dataset['sigma'] = ((np.log(dataset["open"]).rolling(15).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(15)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) * 100
+
+
+        dataset['Volume'] = dataset['volume'] + 1
+
+
+        #dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
+        #dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
+        dataset['market_impact'] = 0.02 + dataset['sigma']*np.sqrt(dataset['inventory']/dataset['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
+        
+
+        dataset['bid_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (2 * dataset['inventory'] + 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
+
+        dataset['ask_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) - (2 * dataset['inventory'] - 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
+        
+
+
+        # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
+        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
+
+        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
+
+
+        #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
+
+        #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
+        
+        #print(dataset)
+        
+
+
+        dataset['spread3'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
+        dataset['spread2'] = dataset['high'] - dataset['low']
+        dataset['Volatility'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
+        dataset['Volatility2'] = (np.log(dataset['Volatility']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
+        dataset['Volatility3'] = (np.log(dataset['open']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
+        dataset['Volatility4'] = (np.log(dataset['Volatility3']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
+        dataset['Volatility_ratio'] = dataset['Volatility'] / dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+
+        
+        dataset['last_return'] = np.log(dataset["open"]).pct_change()
+        dataset['std_normalized'] = np.log(dataset[column_price]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['ma_ratio'] = np.log(dataset[column_price]).rolling(ma_period).apply(ma_ratio, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+        #dataset['price_deviation'] = np.log(dataset[column_price]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+        #dataset['volume_deviation'] = np.log(dataset[column_volume]).rolling(volume_deviation_period).apply(values_deviation)
+        dataset['OBV'] = stats.zscore((np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum())
+        dataset['OBV1'] = (np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum()
+        dataset['OBV2'] = (np.sign(dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
+        dataset['OBV3'] = (np.sign((dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
+
+        dataset['vwap'] = np_vwap(h= dataset['high'],l= dataset['low'],v= dataset['volume'])
+        dataset['D_vwap'] = d_vwap(c= dataset['open'],v= dataset['volume'])
+
+        dataset['rsi_open'] = get_rsi( dataset["open"], 14 )
+        dataset['rsi_high'] = get_rsi( dataset["high"], 14 )
+        dataset['rsi_low'] = get_rsi( dataset["low"], 14 )
+        dataset['rsi_close'] = get_rsi( dataset["close"], 14 )
+        dataset['rsi_volume'] = get_rsi( dataset["volume"], 14 )
+
+        dataset['rsi_vwap'] = get_rsi( dataset["vwap"], 14 )
+        dataset['rsi_D_vwap'] = get_rsi( dataset["D_vwap"], 14 )
+        
+
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
+        #sos = butter(4, 0.125, output='sos')
+
+        for i in dataset.columns.tolist():
+            detrend(dataset[i], overwrite_data=True)
+        
+        for i in dataset.columns.tolist():
+            #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
+            #dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
+            dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            dataset[str(i)+'_smooth_60'] = dataset[i].rolling(60).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        
+
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
+
+        return dataset
 
 def make_model(dataset, symbol, side):
     try: 
@@ -710,9 +847,26 @@ def make_model(dataset, symbol, side):
         dataset['bid_alpha'] = bid_alpha
         dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
         dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
+        dataset['k'] = k
+        
 
-        dataset['spread'] = abs(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - ((np.log(dataset['low']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + np.log(dataset['high']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/2))
-        dataset['variance'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['bid_alpha'] = a
+        dataset['ask_alpha'] = a
+
+        dataset = create_features(dataset)
+
+        now = datetime.now()
+
+        end_of_day = datetime(now.year, now.month, now.day, hour=22)
+
+
+
+
+        steps_in_day = end_of_day - now
+        steps_in_day = float(round(steps_in_day.total_seconds()/60))
+        #steps_in_day = 100
+        #mid_price = float(current_price)
+
         current_variance = (dataset["variance"][-1])
         current_spread = (dataset["spread"][-1])
         current_variance = float(current_variance) * 1000
@@ -722,47 +876,21 @@ def make_model(dataset, symbol, side):
         #dataset['inventory_qty2'] = inventory_qty
         
         mid_price = (float(dataset['close'][-1]))
-        dataset['inventory'] = get_inventory(symbol)
-        dataset["mu"] = abs((np.log(dataset["open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
 
-        dataset['gamma'] = get_inventory_risk(symbol = symbol)
+        inventory = float(inventory_qty)
+        inventory_risk = float(get_inventory_risk(symbol))
+        variance = float(current_variance)
+        total_steps_in_day = float(420)
+        #print(steps_in_day)
+        print("\n inventory: \n", inventory)
 
-
-        dataset['sigma'] = ((np.log(dataset["open"]).rolling(15).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(15)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) * 100
-
-
-        dataset['Volume'] = dataset['volume'] + 1
-
-
-        dataset['k'] = k
-        
-        #(0.5*(dataset['sigma'])*np.sqrt(dataset['Volume']/dataset['Volume'].rolling(15).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))*1
-
-        dataset['bid_alpha'] = a
-        dataset['ask_alpha'] = a
-
-        #dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
-        #dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
-        dataset['market_impact'] = 0.02 + dataset['sigma']*np.sqrt(dataset['inventory']/dataset['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
         
 
-        dataset['bid_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (2 * dataset['inventory'] + 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
+        res = np.array(mid_price) - ((np.array(inventory) * np.array(inventory_risk) * (np.array(variance)) * (1 - (np.array(steps_in_day, dtype='float64')/np.array(total_steps_in_day))))/40)
+        #np.array(current_spread
+        print("\n reservation price: \n", res)
+        print("\n reservation price delta: \n", res-mid_price)
 
-        dataset['ask_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) - (2 * dataset['inventory'] - 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
-        
-
-
-        # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
-        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
-
-        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
-
-
-        #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
-
-        #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
-        
-        #print(dataset)
         print("\n bid: \n", symbol, dataset['bid_spread_aysm2'][-1])
         print("\n ask: \n", symbol, dataset['ask_spread_aysm2'][-1])
 
@@ -770,49 +898,8 @@ def make_model(dataset, symbol, side):
         best_bid = dataset['bid_spread_aysm2'][-1]
 
 
-
-
-        dataset['spread3'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
-        dataset['spread2'] = dataset['high'] - dataset['low']
-        dataset['Volatility'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
-        dataset['Volatility2'] = (np.log(dataset['Volatility']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
-        dataset['Volatility3'] = (np.log(dataset['open']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
-        dataset['Volatility4'] = (np.log(dataset['Volatility3']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
-        dataset['Volatility_ratio'] = dataset['Volatility'] / dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-
-        
-        dataset['last_return'] = np.log(dataset["open"]).pct_change()
-        dataset['std_normalized'] = np.log(dataset[column_price]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-        dataset['ma_ratio'] = np.log(dataset[column_price]).rolling(ma_period).apply(ma_ratio, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-        #dataset['price_deviation'] = np.log(dataset[column_price]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-        #dataset['volume_deviation'] = np.log(dataset[column_volume]).rolling(volume_deviation_period).apply(values_deviation)
-        dataset['OBV'] = stats.zscore((np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum())
-        dataset['OBV1'] = (np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum()
-        dataset['OBV2'] = (np.sign(dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
-        dataset['OBV3'] = (np.sign((dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
-
-        dataset['vwap'] = np_vwap(h= dataset['high'],l= dataset['low'],v= dataset['volume'])
-        dataset['D_vwap'] = d_vwap(c= dataset['open'],v= dataset['volume'])
-
   
 
-        dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0.0000001)
-        #sos = butter(4, 0.125, output='sos')
-
-        for i in dataset.columns.tolist():
-            detrend(dataset[i], overwrite_data=True)
-        
-        for i in dataset.columns.tolist():
-            #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
-            #dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
-            dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            dataset[str(i)+'_smooth_60'] = dataset[i].rolling(60).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-        
-
-        dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0.0000001)
         
 
         #print('dataset: \n', dataset)
@@ -937,7 +1024,7 @@ def make_model(dataset, symbol, side):
             
         }
         tscv = TimeSeriesSplit(n_splits=5, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=3, min_resources=1, max_resources=35, cv=tscv, verbose=1, scoring='f1_weighted')
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=1, max_resources=135, cv=tscv, verbose=1, scoring='f1_weighted')
 
         rscv.fit(X_test2, y_test2)
 
@@ -961,96 +1048,6 @@ def make_model(dataset, symbol, side):
         print("last", str(symbol), str(side), "output: ", CatBoost_pred)
 
         
-
-        
-
-
-        
-        now = datetime.now()
-
-        end_of_day = datetime(now.year, now.month, now.day, hour=22)
-
-
-
-
-        steps_in_day = end_of_day - now
-        steps_in_day = float(round(steps_in_day.total_seconds()/60))
-        #steps_in_day = 100
-        #mid_price = float(current_price)
-
-        if symbol == 'IWM':
-            midpoint = midpoint_IWM
-
-        if symbol == 'SPY':
-            midpoint = midpoint_SPY
-
-        if symbol == 'AMD':
-            midpoint = midpoint_AMD
-
-        
-                    #+ float(df['Open'][-1])) / 2
-
-        inventory = float(inventory_qty)
-        inventory_risk = float(get_inventory_risk(symbol))
-        variance = float(current_variance)
-        total_steps_in_day = float(420)
-        #print(steps_in_day)
-        print("\n inventory: \n", inventory)
-
-        
-
-        res = np.array(mid_price) - ((np.array(inventory) * np.array(inventory_risk) * (np.array(variance)) * (1 - (np.array(steps_in_day, dtype='float64')/np.array(total_steps_in_day))))/40)
-        #np.array(current_spread
-        print("\n reservation price: \n", res)
-        print("\n reservation price delta: \n", res-mid_price)
-
-        
-
-
-        
-
-        #cancel_orders_for_symbol(symbol)
-        
-        best_spread = 0.0001
-
-        
-
-        print("\n midpoint: \n", midpoint)
-
-
-
-        if side == 'OrderSide.BUY':
-            spread = -0.02
-            cancel_orders_for_side(symbol=symbol, side='sell')
-            best_spread = best_bid
-            stop_loss = res - (best_spread * 3)
-            stop_loss_limit = stop_loss - 0.01
-            take_profit = res + (best_spread * 3)
-            if float(best_spread) > -0.01:
-                best_spread = best_spread + -0.05
-
-            
-
-        if side == 'OrderSide.SELL':
-            spread = 0.02
-            cancel_orders_for_side(symbol=symbol, side='buy')
-            best_spread = best_ask
-            stop_loss = res + (best_spread * 3)
-            stop_loss_limit = stop_loss + 0.01
-            take_profit = res - (best_spread * 3)
-            
-            if float(best_spread) < 0.01:
-                best_spread = best_spread + 0.05
-
-            
-
-        spread = best_spread
-        current_price = res
-        limit_price = round(current_price + spread, 2)
-
-
-        #current_price = yf.download(symbol, period="1d", interval="1m")
-        #current_price = float(current_price["Open"][-1:])
 
 
 
