@@ -548,7 +548,7 @@ def limit_order(symbol, limit_price, side, take_profit, stop_loss, stop_loss_lim
                 )
     limit_order_data = trading_client.submit_order(market_order_data)
 
-    order_id = limit_order_data['client_order_id']
+    order_id = limit_order_data[0]
                 
 
     order_list.append(order_id)
