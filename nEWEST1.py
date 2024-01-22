@@ -104,7 +104,6 @@ password = "qu2t3f8Ew9BxM"
 
 login = r.login(username,password, mfa_code=totp)
 
- get a massive speed up of Bill's answer by using numba. 100 loops of 20k row series( regular = 113 seconds, numba = 0.28 seconds ). Numba excels with loops and arithmetic.
 
 import numpy as np
 import numba as nb
