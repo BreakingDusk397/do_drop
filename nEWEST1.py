@@ -1019,7 +1019,7 @@ def make_model(dataset, symbol, side):
             
         }
         tscv = TimeSeriesSplit(n_splits=4, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=15, min_resources=50, max_resources=400, cv=tscv, verbose=1, scoring='f1_weighted')
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=25, max_resources=400, cv=tscv, verbose=1, scoring='f1_weighted')
 
         rscv.fit(X_test2, y_test2)
 
@@ -1217,15 +1217,15 @@ async def create_model(data):
 
 
 
-
+asyncio.create_task(calibrate_params("IWM"))
+asyncio.create_task(take_profit_method("IWM"))
 
 wss_client.subscribe_trades(create_model, "IWM")
 
 wss_client.run()
 
 
-asyncio.create_task(calibrate_params("IWM"))
-asyncio.create_task(take_profit_method("IWM"))
+
 
 
 """
