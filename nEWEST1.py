@@ -819,7 +819,7 @@ def make_model(dataset, symbol, side):
         # Feature params
         
 
-
+        mid_price = (float(dataset['close'][-1]))
         
         dataset['future_return'] = dataset['open'].pct_change(future_period).shift(-future_period)
         #print(dataset['future_return'])
@@ -870,7 +870,7 @@ def make_model(dataset, symbol, side):
         #dataset['best_ask2'] = best_ask
         #dataset['inventory_qty2'] = inventory_qty
         
-        mid_price = (float(dataset['close'][-1]))
+        
 
         inventory = float(inventory_qty)
         inventory_risk = float(get_inventory_risk(symbol))
@@ -1011,15 +1011,15 @@ def make_model(dataset, symbol, side):
             'early_stopping_rounds': np.linspace(1, 20, 20),
             'diffusion_temperature':np.linspace(1, 20000, 200),
             'fold_len_multiplier':np.linspace(2, 10, 50),
-            #'boosting_type': ['Ordered','Plain'],
+            'boosting_type': ['Ordered','Plain'],
             #'thread_count':[-1,-1],
             'loss_function': ['Logloss','CrossEntropy'],
-            'eval_metric': ['AUC','Accuracy', 'Precision', 'Recall', 'F1', 'BalancedAccuracy', 'TotalF1', 'BalancedErrorRate', 'PRAUC','LogLikelihoodOfPrediction'  ],
+            'eval_metric': ['AUC', 'Precision', 'Recall', 'F1', 'BalancedAccuracy', 'TotalF1', 'BalancedErrorRate', 'PRAUC' ],
 
             
         }
-        tscv = TimeSeriesSplit(n_splits=5, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=1, max_resources=135, cv=tscv, verbose=1, scoring='f1_weighted')
+        tscv = TimeSeriesSplit(n_splits=4, gap=1)
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=15, min_resources=1, max_resources=200, cv=tscv, verbose=1, scoring='f1_weighted')
 
         rscv.fit(X_test2, y_test2)
 
