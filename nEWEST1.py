@@ -100,19 +100,19 @@ yf_download_previous = 0
 
 symbol = "IWM"
 BASE_URL = "https://paper-api.alpaca.markets"
-API_KEY = "PKCSSHRBEDBBETRCTIC0"
-SECRET_KEY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
+A_KY = "PKCSSHRBEDBBETRCTIC0"
+S_KY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
 
-trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+trading_client = TradingClient(A_KY, S_KY, paper=True)
 
 symbol = symbol
 totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
 #print("Current OTP:", totp)
 
-username = "torndoff@icloud.com"
-password = "qu2t3f8Ew9BxM"
+un = "torndoff@icloud.com"
+pw = "qu2t3f8Ew9BxM"
 
-login = r.login(username,password, mfa_code=totp)
+login = r.login(un,pw, mfa_code=totp)
 
 
 
@@ -360,7 +360,7 @@ def get_inventory(symbol):
         #df_orderbook = yf_download()
         #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)  
         symbol = symbol
-        trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+        trading_client = TradingClient(A_KY, S_KY, paper=True)
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
         inventory_qty = int(ORDERS[1][6])
@@ -391,7 +391,7 @@ def get_time_til_close(symbol):
     try:
         symbol = symbol
         now = datetime.now()
-        trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+        trading_client = TradingClient(A_KY, S_KY, paper=True)
         
 
         if int(now.hour) > 21:
@@ -409,7 +409,7 @@ def get_inventory_risk(symbol):
     try:
         symbol = str(symbol)
 
-        trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+        trading_client = TradingClient(A_KY, S_KY, paper=True)
     
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
@@ -443,7 +443,7 @@ def get_open_position(symbol):
 
     try:
         symbol = symbol
-        trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+        trading_client = TradingClient(A_KY, S_KY, paper=True)
     
         position = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(position)
@@ -468,7 +468,7 @@ async def take_profit_method(symbol):
         try:
                 
             symbol = symbol
-            trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+            trading_client = TradingClient(A_KY, S_KY, paper=True)
             position = trading_client.get_open_position(symbol)
             ORDERS = pd.DataFrame(position)
 
@@ -579,7 +579,7 @@ def cancel_orders_for_symbol(symbol):
 
     try:
         
-        trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+        trading_client = TradingClient(A_KY, S_KY, paper=True)
         get_order = GetOrdersRequest(symbols=[symbol], limit=500)
         ORDERS = trading_client.get_orders(get_order)
         ORDERS = pd.DataFrame.from_records(ORDERS)
@@ -605,7 +605,7 @@ def cancel_orders_for_side(symbol, side):
 
     try:
 
-        trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+        trading_client = TradingClient(A_KY, S_KY, paper=True)
         get_order = GetOrdersRequest(symbols=[symbol], limit=500, side=side)
         ORDERS = trading_client.get_orders(get_order)
         ORDERS = pd.DataFrame.from_records(ORDERS)
@@ -632,7 +632,7 @@ def match_orders_for_symbol(symbol):
 
     try:
         symbol = symbol
-        trading_client = TradingClient(API_KEY, SECRET_KEY, paper=True)
+        trading_client = TradingClient(A_KY, S_KY, paper=True)
         ORDERS = trading_client.get_open_position(symbol)
         ORDERS = pd.DataFrame(ORDERS)
         #print('\n ORDERS: \n',ORDERS)
@@ -1128,9 +1128,9 @@ def make_model(dataset, symbol, side):
 
 from alpaca.data.live import StockDataStream, CryptoDataStream
 
-API_KEY = "PKCSSHRBEDBBETRCTIC0"
-SECRET_KEY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
-wss_client = StockDataStream(API_KEY, SECRET_KEY)
+A_KY = "PKCSSHRBEDBBETRCTIC0"
+S_KY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
+wss_client = StockDataStream(A_KY, S_KY)
 
 now = datetime.now()
 ask_price_list = pd.DataFrame()
