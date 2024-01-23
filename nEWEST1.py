@@ -96,6 +96,7 @@ std_period = 15
 ma_period = 15
 price_deviation_period = 15
 volume_deviation_period = 15
+yf_download_previous = 0
 
 symbol = "IWM"
 BASE_URL = "https://paper-api.alpaca.markets"
@@ -114,10 +115,10 @@ password = "qu2t3f8Ew9BxM"
 login = r.login(username,password, mfa_code=totp)
 
 
-import numpy as np
+
 import numba as nb
 
-@nb.jit(fastmath=True, nopython=True)   
+@nb.jit(fastmath=True, nopython=True, cache=True)   
 def calc_rsi( array, deltas, avg_gain, avg_loss, n ):
 
     # Use Wilder smoothing method
@@ -195,8 +196,9 @@ async def calibrate_params(symbol):
                                 
                             )
                 limit_order_data = trading_client.submit_order(market_order_data)
+                
                 time.sleep(1)
-                order_id = limit_order_data['client_order_id']
+                order_id = limit_order_data[1]
 
                 order_id_list_buy.append(order_id)
                 order_i_list_buy.append(i)
@@ -217,7 +219,7 @@ async def calibrate_params(symbol):
                             )
                 limit_order_data = trading_client.submit_order(market_order_data)
                 time.sleep(1)
-                order_id = limit_order_data['client_order_id']
+                order_id = limit_order_data[1]
                 
 
                 order_id_list_sell.append(order_id)
@@ -225,16 +227,16 @@ async def calibrate_params(symbol):
 
             for i in order_id_list_buy:
                 order = trading_client.get_order_by_client_id(i)
-                order_begin = order['created_at']
-                order_end = order['filled_at']
+                order_begin = order[2]
+                order_end = order[5]
 
                 duration = order_end - order_begin
                 duration_buy.append(duration)
 
             for i in order_id_list_sell:
                 order = trading_client.get_order_by_client_id(i)
-                order_begin = order['created_at']
-                order_end = order['filled_at']
+                order_begin = order[2]
+                order_end = order[5]
 
                 duration = order_end - order_begin
                 duration_sell.append(duration)
@@ -261,9 +263,16 @@ async def calibrate_params(symbol):
 
 
 def yf_download():
-    df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
-    #yf_download_previous = df_orderbook  #Creates a variable that stores the previous version of df_orderbook for when Yahoo denies the request
-    return df_orderbook
+    global yf_download_previous
+
+    try:
+        
+        df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
+        yf_download_previous = df_orderbook # Creates a variable that stores the previous version of df_orderbook for when Yahoo denies the request
+        return df_orderbook
+    
+    except:
+        return yf_download_previous
 
 def get_pricebook(symbol):
 
@@ -473,7 +482,7 @@ async def take_profit_method(symbol):
                 
                 trading_client.close_position(symbol)
             
-            if float(ORDERS[1][12]) >=  4:
+            if float(ORDERS[1][12]) >=  5:
                 
                 cancel_orders_for_symbol(symbol=symbol)
                 
@@ -540,7 +549,7 @@ def limit_order(symbol, limit_price, side, take_profit, stop_loss, stop_loss_lim
                     side=side,
                     type='bracket',
                     time_in_force=TimeInForce.GTC,
-                    limit_price = limit_price,
+                    limit_price = round(limit_price, 2),
                     take_profit={'limit_price': round(take_profit, 2)},
                     stop_loss={'stop_price': round((stop_loss), 2),
                     'limit_price':  round((stop_loss_limit), 2)},
@@ -548,7 +557,7 @@ def limit_order(symbol, limit_price, side, take_profit, stop_loss, stop_loss_lim
                 )
     limit_order_data = trading_client.submit_order(market_order_data)
 
-    order_id = limit_order_data[0]
+    order_id = limit_order_data[1]
                 
 
     order_list.append(order_id)
@@ -1011,7 +1020,7 @@ def make_model(dataset, symbol, side):
             'early_stopping_rounds': np.linspace(1, 20, 20),
             'diffusion_temperature':np.linspace(1, 20000, 200),
             'fold_len_multiplier':np.linspace(2, 10, 50),
-            'boosting_type': ['Ordered','Plain'],
+            #'boosting_type': ['Ordered','Plain'],
             #'thread_count':[-1,-1],
             'loss_function': ['Logloss','CrossEntropy'],
             'eval_metric': ['AUC', 'Precision', 'Recall', 'F1', 'BalancedAccuracy', 'TotalF1', 'BalancedErrorRate', 'PRAUC' ],
@@ -1019,7 +1028,7 @@ def make_model(dataset, symbol, side):
             
         }
         tscv = TimeSeriesSplit(n_splits=4, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=25, max_resources=400, cv=tscv, verbose=1, scoring='f1_weighted')
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=25, max_resources=500, cv=tscv, verbose=1, scoring='f1_weighted')
 
         rscv.fit(X_test2, y_test2)
 
@@ -1181,8 +1190,7 @@ async def create_model(data):
     
 
 
-    asyncio.gather(calibrate_params("IWM"))
-    asyncio.gather(take_profit_method("IWM"))
+    
 
 
     global data_out
@@ -1190,10 +1198,6 @@ async def create_model(data):
     data_in = pd.DataFrame()
 
     data_in = await trade_data_handler(data)
-
-    #print(type(data_in))
-    #print(type(data_out))
-
 
     data_out = pd.merge(left=data_in, right=data_out, left_index=True, right_index=True, how='outer', suffixes=('', '_y'))
 
@@ -1211,13 +1215,11 @@ async def create_model(data):
 
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
-    #take_profit_method(symbol='IWM')
-    #take_profit_method(symbol='SPY')
-    #get_time_til_close(symbol='IWM')
-    #get_time_til_close(symbol='SPY')
 
 
 
+asyncio.gather(calibrate_params("IWM"))
+asyncio.gather(take_profit_method("IWM"))
 
 wss_client.subscribe_trades(create_model, "IWM")
 
