@@ -1216,14 +1216,21 @@ async def create_model(data):
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
 
+while True:
+    now = datetime.now()
+    print(now.hour, now.minute, now.second)
+    if now.hour >= 15:
+        if now.minute >= 30:
+            print(now)
+            # Call your CODE() function here
+            asyncio.gather(calibrate_params("IWM"))
+            asyncio.gather(take_profit_method("IWM"))
+
+            wss_client.subscribe_trades(create_model, "IWM")
+
+            wss_client.run()
 
 
-asyncio.gather(calibrate_params("IWM"))
-asyncio.gather(take_profit_method("IWM"))
-
-wss_client.subscribe_trades(create_model, "IWM")
-
-wss_client.run()
 
 
 
