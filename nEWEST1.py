@@ -1020,14 +1020,14 @@ def make_model(dataset, symbol, side):
         grid = {
 
             'max_depth': randint(2,7),
-            'learning_rate': np.linspace(0.001, 1, 50),
+            'learning_rate': np.linspace(0.001, 1, 100),
             #'iterations': np.arange(100, 1000, 100),
             'l2_leaf_reg': np.linspace(0.1, 20, 50),
             'random_strength': np.linspace(0.1, 20, 50),
             'subsample': np.linspace(0.75, 1, 5),
-            'bagging_temperature': np.linspace(0.1, 20, 50),
+            'bagging_temperature': np.linspace(0.1, 5, 50),
             'early_stopping_rounds': np.linspace(1, 20, 20),
-            'diffusion_temperature':np.linspace(1, 20000, 200),
+            'diffusion_temperature':np.linspace(1, 50000, 400),
             'fold_len_multiplier':np.linspace(2, 10, 50),
             #'boosting_type': ['Ordered','Plain'],
             #'thread_count':[-1,-1],
@@ -1228,7 +1228,7 @@ async def create_model(data):
 while True:
     now = datetime.now()
     print(now.hour, now.minute, now.second)
-    if now.hour >= 15:
+    if now.hour >= 14:
         if now.minute >= 30:
             print(now)
             # Call your CODE() function here
