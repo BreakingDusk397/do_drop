@@ -1254,19 +1254,20 @@ async def create_model(data):
 while True:
     now = datetime.now()
     print(now.hour, now.minute, now.second)
-    if int(now.hour) >= int(14):
-        if int(now.minute) >= int(30):
-            print(now)
-            # Call your CODE() function here
-            asyncio.gather(calibrate_params("IWM"))
-            asyncio.gather(take_profit_method("IWM"))
+    if int(now.hour) >= int(15):
 
-            wss_client.subscribe_trades(create_model, "IWM")
+        print(now)
+        # Call your CODE() function here
+        asyncio.gather(calibrate_params("IWM"))
+        asyncio.gather(take_profit_method("IWM"))
 
-            wss_client.run()
+        wss_client.subscribe_trades(create_model, "IWM")
+
+        wss_client.run()
 
 
     
+    #time.sleep(10)
 
 
 
