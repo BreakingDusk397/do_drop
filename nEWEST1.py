@@ -200,7 +200,9 @@ async def calibrate_params(symbol):
                 limit_order_data = trading_client.submit_order(market_order_data)
                 
                 time.sleep(1)
-                order_id = limit_order_data[1]
+                limit_order_data = pd.DataFrame(limit_order_data)
+                print("\n limit_order_data: \n", limit_order_data)
+                order_id = limit_order_data[1][1]
 
                 order_id_list_buy.append(order_id)
                 order_i_list_buy.append(i)
@@ -221,24 +223,25 @@ async def calibrate_params(symbol):
                             )
                 limit_order_data = trading_client.submit_order(market_order_data)
                 time.sleep(1)
-                order_id = limit_order_data[1]
+                limit_order_data = pd.DataFrame(limit_order_data)
+                order_id = limit_order_data[1][1]
                 
 
                 order_id_list_sell.append(order_id)
                 order_i_list_sell.append(i)
 
             for i in order_id_list_buy:
-                order = trading_client.get_order_by_client_id(i)
-                order_begin = order[2]
-                order_end = order[5]
+                order = pd.DataFrame(trading_client.get_order_by_client_id(i))
+                order_begin = order[1][2]
+                order_end = order[1][5]
 
                 duration = order_end - order_begin
                 duration_buy.append(duration)
 
             for i in order_id_list_sell:
-                order = trading_client.get_order_by_client_id(i)
-                order_begin = order[2]
-                order_end = order[5]
+                order = pd.DataFrame(trading_client.get_order_by_client_id(i))
+                order_begin = order[1][2]
+                order_end = order[1][5]
 
                 duration = order_end - order_begin
                 duration_sell.append(duration)
@@ -564,6 +567,8 @@ def limit_order(symbol, limit_price, side, take_profit, stop_loss, stop_loss_lim
                 )
     limit_order_data = trading_client.submit_order(market_order_data)
 
+    limit_order_data = pd.DataFrame(limit_order_data)
+
     order_id = limit_order_data[1]
                 
 
@@ -646,12 +651,13 @@ def match_orders_for_symbol(symbol):
         side = str(ORDERS[1][7])
         qty = float(ORDERS[1][20])
         
+        cancel_orders_for_symbol(symbol)
 
         if str(side) == 'PositionSide.SHORT':
 
             cancel_orders_for_side(symbol=symbol, side='buy')
             limit_order(symbol=symbol, 
-                        spread=-0.021 + (best_bid),
+                        spread=-0.021 + float(best_bid),
                         side=OrderSide.BUY, 
                         take_profit_multiplier = 2,
                         loss_stop_multiplier = 2,
@@ -665,7 +671,7 @@ def match_orders_for_symbol(symbol):
             
             cancel_orders_for_side(symbol=symbol, side='sell')
             limit_order(symbol=symbol, 
-                        spread=0.021 + best_ask, 
+                        spread=0.021 + float(best_ask), 
                         side=OrderSide.SELL, 
                         take_profit_multiplier = 2,
                         loss_stop_multiplier = 2,
@@ -803,13 +809,13 @@ def create_features(dataset):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
         #sos = butter(4, 0.125, output='sos')
-        """
+        
         for i in dataset.columns.tolist():
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
-
+        """
         for i in dataset.columns.tolist():
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["Volatility"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             """
@@ -878,6 +884,7 @@ def make_model(dataset, symbol, side):
         dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
         dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
         dataset['k'] = k
+        dataset['midpoint'] = midpoint
         
 
         dataset['bid_alpha'] = a
@@ -1036,7 +1043,7 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=30, steps=3, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
+        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=30, steps=4, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
@@ -1062,8 +1069,8 @@ def make_model(dataset, symbol, side):
 
             
         }
-        tscv = TimeSeriesSplit(n_splits=4, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=25, max_resources=500, cv=tscv, verbose=1, scoring='f1_weighted')
+        tscv = TimeSeriesSplit(n_splits=3, gap=1)
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=25, max_resources=500, cv=tscv, verbose=1, scoring='recall')
 
         rscv.fit(X_test2, y_test2)
 
@@ -1250,6 +1257,7 @@ async def create_model(data):
 
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
+    match_orders_for_symbol(symbol='IWM')
 
 while True:
     now = datetime.now()
