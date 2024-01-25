@@ -858,6 +858,8 @@ def create_features(dataset):
         return dataset
 
 def make_model(dataset, symbol, side):
+    global best_ask
+    global best_bid
     try: 
         t0 = time.time()
 
@@ -955,7 +957,7 @@ def make_model(dataset, symbol, side):
         best_ask = dataset['ask_spread_aysm2'][-1]
         best_bid = dataset['bid_spread_aysm2'][-1]
 
-
+        print('\n before transform dataset: \n', dataset)
   
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
