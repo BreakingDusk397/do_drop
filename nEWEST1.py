@@ -804,6 +804,9 @@ def create_features(dataset):
         #sos = butter(4, 0.125, output='sos')
 
         for i in dataset.columns.tolist():
+            dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+
+        for i in dataset.columns.tolist():
             detrend(dataset[i], overwrite_data=True)
         
         for i in dataset.columns.tolist():
