@@ -803,7 +803,7 @@ def create_features(dataset):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
         #sos = butter(4, 0.125, output='sos')
-
+        """
         for i in dataset.columns.tolist():
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
 
@@ -812,6 +812,7 @@ def create_features(dataset):
 
         for i in dataset.columns.tolist():
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["Volatility"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            """
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -951,7 +952,7 @@ def make_model(dataset, symbol, side):
         dataset = winsorize(dataset.values, limits=[0.05, 0.05], inplace=True, nan_policy='propagate')
         dataset = pd.DataFrame(dataset, columns=columns_list, index=index1)
         #print('\n after winsorize dataset: \n', dataset)
-        print('\n after winsorize dataset: \n', dataset.describe())
+        
         #dataset = dataset.dropna(how="all", axis=1)
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         #dataset = dataset.dropna(how='any')
@@ -1008,7 +1009,9 @@ def make_model(dataset, symbol, side):
 
         
         #print('\n dataset: \n', dataset)
-        #print('\n y: \n', y)
+        print('\n after winsorize dataset: \n', dataset.describe())
+        print('\n y: \n', y.describe())
+        print('\n y_sell: \n', y_sell.describe())
 
         #print('\n last dataset input: \n', dataset[-1:])
         #print('\n last y input: \n', y[-1:])
