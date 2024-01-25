@@ -488,13 +488,12 @@ def get_open_position(symbol):
 async def take_profit_method(symbol):
     while True:
         try:
-                
+            
             symbol = symbol
             trading_client = TradingClient(A_KY, S_KY, paper=True)
             position = trading_client.get_open_position(symbol)
             ORDERS = pd.DataFrame(position)
-            side = str(ORDERS[1][7])
-            qty = float(ORDERS[1][20])
+            
 
             if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.05:
                 cancel_orders_for_symbol(symbol=symbol)
@@ -559,7 +558,7 @@ async def take_profit_method(symbol):
             print(traceback.format_exc())
 
         finally:
-            print("\n Current", qty, side, "positions have been closed. \n")
+            print("\n Current positions have been closed. \n")
             await asyncio.sleep(3)
 
 
