@@ -59,7 +59,7 @@ from scipy.signal import *
 
 pd.set_option("display.precision", 3)
 pd.set_option('display.max_rows', 20)
-pd.set_option('display.max_columns', 60)
+pd.set_option('display.max_columns', 10)
 pd.set_option('display.width', 100)
 
 print(datetime.now())
@@ -412,6 +412,7 @@ def get_time_til_close(symbol):
 def get_inventory_risk(symbol):
     inventory_risk = 0.002
     try:
+        inventory_qty = 1
         symbol = str(symbol)
 
         trading_client = TradingClient(A_KY, S_KY, paper=True)
@@ -438,7 +439,9 @@ def get_inventory_risk(symbol):
         #print(traceback.format_exc())
         
         
-
+    finally:
+            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
+            
     
 
     return inventory_risk
@@ -455,15 +458,22 @@ def get_open_position(symbol):
     
         inventory_qty = int(ORDERS[1][6])
 
+        side = str(ORDERS[1][7])
+        qty = float(ORDERS[1][20])
+
         
     except:
 
         print("No inventory position.")
         inventory_qty = 1
         #print(traceback.format_exc())
+
+    finally:
+            print("\n Current", qty, side, "position. \n")
+            return inventory_qty
         
     
-    return inventory_qty
+    
 
 
 
@@ -476,6 +486,8 @@ async def take_profit_method(symbol):
             trading_client = TradingClient(A_KY, S_KY, paper=True)
             position = trading_client.get_open_position(symbol)
             ORDERS = pd.DataFrame(position)
+            side = str(ORDERS[1][7])
+            qty = float(ORDERS[1][20])
 
             if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.05:
                 cancel_orders_for_symbol(symbol=symbol)
@@ -536,11 +548,11 @@ async def take_profit_method(symbol):
                     
 
         except:
-            print ("take_profit_method error.")
-            #print(traceback.format_exc())
+            print ("\n take_profit_method error. \n")
+            print(traceback.format_exc())
 
         finally:
-        
+            print("\n Current", qty, side, "positions have been closed. \n")
             await asyncio.sleep(3)
 
 
@@ -683,9 +695,12 @@ def match_orders_for_symbol(symbol):
         
 
     except:    
-        print("match_orders_for_symbol() exception, probably no inventory present.")  
-        #print(traceback.format_exc())   
+        print("\n match_orders_for_symbol() exception, probably no inventory present. \n")  
+        print(traceback.format_exc())   
         pass
+
+    finally:
+        print("\n Current", qty, side, "positions have been matched. \n")
 
 
 
@@ -1231,7 +1246,8 @@ async def create_model(data):
     
     
 
-
+    asyncio.gather(calibrate_params("IWM"))
+    asyncio.gather(take_profit_method("IWM"))
     
 
 
