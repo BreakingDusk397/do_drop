@@ -1262,6 +1262,8 @@ while True:
 
             wss_client.run()
 
+            time.sleep(10)
+
 
 
 
