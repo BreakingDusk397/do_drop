@@ -207,8 +207,15 @@ async def calibrate_params(symbol):
                 order_id_list_buy.append(order_id)
                 order_i_list_buy.append(i)
 
+                for i in order_id_list_buy:
+                    order = pd.DataFrame(trading_client.get_order_by_client_id(i))
+                    print("\n order: \n", order)
+                    order_begin = order[1][2]
+                    order_end = order[1][5]
+                    duration = order_end - order_begin
+                    duration_buy.append(duration)
 
-                
+                """
                 market_order_data = LimitOrderRequest(
                                 symbol=symbol,
                                 qty=1,
@@ -230,13 +237,7 @@ async def calibrate_params(symbol):
                 order_id_list_sell.append(order_id)
                 order_i_list_sell.append(i)
 
-            for i in order_id_list_buy:
-                order = pd.DataFrame(trading_client.get_order_by_client_id(i))
-                order_begin = order[1][2]
-                order_end = order[1][5]
-
-                duration = order_end - order_begin
-                duration_buy.append(duration)
+            
 
             for i in order_id_list_sell:
                 order = pd.DataFrame(trading_client.get_order_by_client_id(i))
@@ -247,18 +248,24 @@ async def calibrate_params(symbol):
                 duration_sell.append(duration)
 
 
-            X = order_i_list_buy.reverse()
-            y = duration_buy.reverse()
-            popt, pcov = curve_fit(exp_decay, X, y, p0=(1,1,1))
 
             X_sell = order_i_list_sell.reverse()
             y_sell = duration_sell.reverse()
             popt_sell, pcov_sell = curve_fit(exp_decay, X_sell, y_sell, p0=(1,1,1))
+            print("\n Calculated parameters for ", symbol, " selling side: ", popt_sell)
+            """
+
+
+            X = order_i_list_buy.reverse()
+            y = duration_buy.reverse()
+            popt, pcov = curve_fit(exp_decay, X, y, p0=(1,1,1))
+
+            
 
             print("\n Calculated parameters for ", symbol, " buying side: ", popt)
-            print("\n Calculated parameters for ", symbol, " selling side: ", popt_sell)
+            
 
-            calibrate_params_previous = [popt, popt_sell]
+            calibrate_params_previous = popt
 
         except:
             print("\n Calibrating k, A error... \n")
@@ -957,7 +964,7 @@ def make_model(dataset, symbol, side):
         best_ask = dataset['ask_spread_aysm2'][-1]
         best_bid = dataset['bid_spread_aysm2'][-1]
 
-        print('\n before transform dataset: \n', dataset)
+        #print('\n before transform dataset: \n', dataset)
   
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -1222,10 +1229,10 @@ async def trade_data_handler(data):
         
         ask_price_list = pd.concat([ask_price_list, row])
         ask_price_list['d_vwap'] = d_vwap(ask_price_list['close'], ask_price_list['volume'])
-        d_vwap1 = ask_price_list['d_vwap'].resample('5S').mean()
-        volume = ask_price_list['volume'].resample('5S').sum()
+        d_vwap1 = ask_price_list['d_vwap'].resample('1S').mean()
+        volume = ask_price_list['volume'].resample('1S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('5S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('1S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
