@@ -1261,8 +1261,8 @@ while True:
             wss_client.subscribe_trades(create_model, "IWM")
 
             wss_client.run()
-
-            time.sleep(10)
+    
+    time.sleep(10)
 
 
 
