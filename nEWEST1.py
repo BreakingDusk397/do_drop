@@ -1265,7 +1265,7 @@ while True:
 
             wss_client.run()
 
-            time.sleep(25200) # approx. 420 minutes
+
     
     time.sleep(10)
 
