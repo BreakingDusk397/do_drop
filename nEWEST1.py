@@ -59,7 +59,7 @@ from scipy.signal import *
 
 pd.set_option("display.precision", 3)
 pd.set_option('display.max_rows', 20)
-pd.set_option('display.max_columns', 20)
+pd.set_option('display.max_columns', 40)
 pd.set_option('display.width', 100)
 
 print(datetime.now())
