@@ -59,7 +59,7 @@ from scipy.signal import *
 
 pd.set_option("display.precision", 3)
 pd.set_option('display.max_rows', 20)
-pd.set_option('display.max_columns', 10)
+pd.set_option('display.max_columns', 20)
 pd.set_option('display.width', 100)
 
 print(datetime.now())
@@ -137,6 +137,8 @@ def calc_rsi( array, deltas, avg_gain, avg_loss, n ):
 
     return array
 
+
+@jit(cache=True) 
 def get_rsi( array, n = 14 ):   
 
     deltas = np.append([0],np.diff(array))
@@ -477,10 +479,7 @@ async def take_profit_method(symbol):
                 
                 trading_client.close_position(symbol)
 
-            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.12:
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
+            
             
             if float(ORDERS[1][12]) >=  5:
                 
@@ -489,13 +488,21 @@ async def take_profit_method(symbol):
                 trading_client.close_position(symbol)
                 
 
+            
+                
+            """
+            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.12:
+                cancel_orders_for_symbol(symbol=symbol)
+                
+                trading_client.close_position(symbol)
+
             if float(ORDERS[1][12]) <=  -13:
 
                 cancel_orders_for_symbol(symbol=symbol)
                 
                 trading_client.close_position(symbol)
-                
-            """
+
+
             elif str(ORDERS[1][7]) ==  "PositionSide.LONG":
 
                 if float(ORDERS[1][5]) - float(ORDERS[1][14]) <= -0.1:
@@ -718,6 +725,42 @@ def z_score_df(df):
 @jit(cache=True)
 def create_features(dataset):
 
+        
+        #print(dataset)
+        
+
+
+        dataset['spread3'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
+        dataset['spread2'] = dataset['high'] - dataset['low']
+        dataset['Volatility'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
+        dataset['Volatility2'] = (np.log(dataset['Volatility']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
+        dataset['Volatility3'] = (np.log(dataset['open']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
+        dataset['Volatility4'] = (np.log(dataset['Volatility3']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
+        dataset['Volatility_ratio'] = dataset['Volatility'] / dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+
+        
+        dataset['last_return'] = np.log(dataset["open"]).pct_change()
+        dataset['std_normalized'] = np.log(dataset[column_price]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['ma_ratio'] = np.log(dataset[column_price]).rolling(ma_period).apply(ma_ratio, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+        #dataset['price_deviation'] = np.log(dataset[column_price]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
+        #dataset['volume_deviation'] = np.log(dataset[column_volume]).rolling(volume_deviation_period).apply(values_deviation)
+        dataset['OBV'] = stats.zscore((np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum())
+        dataset['OBV1'] = (np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum()
+        dataset['OBV2'] = (np.sign(dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
+        dataset['OBV3'] = (np.sign((dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
+
+        dataset['vwap'] = np_vwap(h= dataset['high'],l= dataset['low'],v= dataset['volume'])
+        dataset['D_vwap'] = d_vwap(c= dataset['open'],v= dataset['volume'])
+
+        dataset['rsi_open'] = get_rsi( dataset["open"], 14 )
+        dataset['rsi_high'] = get_rsi( dataset["high"], 14 )
+        dataset['rsi_low'] = get_rsi( dataset["low"], 14 )
+        dataset['rsi_close'] = get_rsi( dataset["close"], 14 )
+        dataset['rsi_volume'] = get_rsi( dataset["volume"], 14 )
+
+        dataset['rsi_vwap'] = get_rsi( dataset["vwap"], 14 )
+        dataset['rsi_D_vwap'] = get_rsi( dataset["D_vwap"], 14 )
+
         dataset['spread'] = abs(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - ((np.log(dataset['low']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + np.log(dataset['high']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/2))
         dataset['variance'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
 
@@ -754,40 +797,6 @@ def create_features(dataset):
 
         #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
         
-        #print(dataset)
-        
-
-
-        dataset['spread3'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
-        dataset['spread2'] = dataset['high'] - dataset['low']
-        dataset['Volatility'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
-        dataset['Volatility2'] = (np.log(dataset['Volatility']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
-        dataset['Volatility3'] = (np.log(dataset['open']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
-        dataset['Volatility4'] = (np.log(dataset['Volatility3']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
-        dataset['Volatility_ratio'] = dataset['Volatility'] / dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-
-        
-        dataset['last_return'] = np.log(dataset["open"]).pct_change()
-        dataset['std_normalized'] = np.log(dataset[column_price]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-        dataset['ma_ratio'] = np.log(dataset[column_price]).rolling(ma_period).apply(ma_ratio, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-        #dataset['price_deviation'] = np.log(dataset[column_price]).rolling(price_deviation_period).apply(values_deviation, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
-        #dataset['volume_deviation'] = np.log(dataset[column_volume]).rolling(volume_deviation_period).apply(values_deviation)
-        dataset['OBV'] = stats.zscore((np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum())
-        dataset['OBV1'] = (np.sign(dataset["open"].diff()) * dataset['volume']).fillna(0.0000001).cumsum()
-        dataset['OBV2'] = (np.sign(dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
-        dataset['OBV3'] = (np.sign((dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
-
-        dataset['vwap'] = np_vwap(h= dataset['high'],l= dataset['low'],v= dataset['volume'])
-        dataset['D_vwap'] = d_vwap(c= dataset['open'],v= dataset['volume'])
-
-        dataset['rsi_open'] = get_rsi( dataset["open"], 14 )
-        dataset['rsi_high'] = get_rsi( dataset["high"], 14 )
-        dataset['rsi_low'] = get_rsi( dataset["low"], 14 )
-        dataset['rsi_close'] = get_rsi( dataset["close"], 14 )
-        dataset['rsi_volume'] = get_rsi( dataset["volume"], 14 )
-
-        dataset['rsi_vwap'] = get_rsi( dataset["vwap"], 14 )
-        dataset['rsi_D_vwap'] = get_rsi( dataset["D_vwap"], 14 )
         
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
