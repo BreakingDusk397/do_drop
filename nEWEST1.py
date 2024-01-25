@@ -807,8 +807,20 @@ def create_features(dataset):
         for i in dataset.columns.tolist():
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
 
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
+
+        for i in dataset.columns.tolist():
+            dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["Volatility"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
+
         for i in dataset.columns.tolist():
             detrend(dataset[i], overwrite_data=True)
+
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
         
         for i in dataset.columns.tolist():
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
