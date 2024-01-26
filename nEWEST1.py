@@ -90,7 +90,7 @@ dataset = pd.DataFrame()
 df = pd.DataFrame()
 data_in = pd.DataFrame()
 data_out = pd.DataFrame()
-future_period = 2
+future_period = 1
 future_period1 = 10
 std_period = 15
 ma_period = 15
@@ -182,8 +182,7 @@ async def calibrate_params(symbol):
 
         try:    
             ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
-            for i in range(1,10):
-                
+            for i in range(1,8):
 
                 market_order_data = LimitOrderRequest(
                                 symbol=symbol,
@@ -199,21 +198,23 @@ async def calibrate_params(symbol):
                             )
                 limit_order_data = trading_client.submit_order(market_order_data)
                 
-                time.sleep(1)
-                limit_order_data = pd.DataFrame(limit_order_data)
-                print("\n limit_order_data: \n", limit_order_data)
-                order_id = limit_order_data[1][1]
+                time.sleep(2)
 
-                order_id_list_buy.append(order_id)
-                order_i_list_buy.append(i)
+            time.sleep(60)
+            limit_order_data = pd.DataFrame(limit_order_data)
+            #print("\n limit_order_data: \n", limit_order_data)
+            order_id = limit_order_data[1][1]
 
-                for i in order_id_list_buy:
-                    order = pd.DataFrame(trading_client.get_order_by_client_id(i))
-                    print("\n order: \n", order)
-                    order_begin = order[1][2]
-                    order_end = order[1][5]
-                    duration = order_end - order_begin
-                    duration_buy.append(duration)
+            order_id_list_buy.append(order_id)
+            order_i_list_buy.append(i)
+
+            for i in order_id_list_buy:
+                order = pd.DataFrame(trading_client.get_order_by_client_id(i))
+                #print("\n order: \n", order)
+                order_begin = order[1][2]
+                order_end = order[1][5]
+                duration = order_end - order_begin
+                duration_buy.append(duration)
 
                 """
                 market_order_data = LimitOrderRequest(
@@ -489,10 +490,13 @@ async def take_profit_method(symbol):
     while True:
         try:
             
+            
             symbol = symbol
             trading_client = TradingClient(A_KY, S_KY, paper=True)
             position = trading_client.get_open_position(symbol)
             ORDERS = pd.DataFrame(position)
+
+            cancel_orders_for_symbol(symbol)
             
 
             if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.05:
@@ -555,7 +559,7 @@ async def take_profit_method(symbol):
 
         except:
             print ("\n take_profit_method error. \n")
-            print(traceback.format_exc())
+            #print(traceback.format_exc())
 
         finally:
             print("\n Current positions have been closed. \n")
@@ -806,7 +810,7 @@ def create_features(dataset):
 
         #dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
         #dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
-        dataset['market_impact'] = 0.02 + dataset['sigma']*np.sqrt(dataset['inventory']/dataset['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
+        dataset['market_impact'] = dataset['sigma']*np.sqrt(dataset['inventory']/dataset['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
         
 
         dataset['bid_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (2 * dataset['inventory'] + 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
@@ -826,7 +830,7 @@ def create_features(dataset):
         #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
         
         
-
+        """
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
         #sos = butter(4, 0.125, output='sos')
@@ -836,7 +840,7 @@ def create_features(dataset):
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
-        """
+        
         for i in dataset.columns.tolist():
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["Volatility"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             """
@@ -854,7 +858,7 @@ def create_features(dataset):
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
             #dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
             dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            #dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             dataset[str(i)+'_smooth_60'] = dataset[i].rolling(60).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         
 
@@ -1039,9 +1043,9 @@ def make_model(dataset, symbol, side):
 
         
         #print('\n dataset: \n', dataset)
-        print('\n after winsorize dataset: \n', dataset.describe())
-        print('\n y: \n', y.describe())
-        print('\n y_sell: \n', y_sell.describe())
+        #print('\n after winsorize dataset: \n', dataset.describe())
+        #print('\n y: \n', y.describe())
+        #print('\n y_sell: \n', y_sell.describe())
 
         #print('\n last dataset input: \n', dataset[-1:])
         #print('\n last y input: \n', y[-1:])
@@ -1228,10 +1232,10 @@ async def trade_data_handler(data):
         
         ask_price_list = pd.concat([ask_price_list, row])
         ask_price_list['d_vwap'] = d_vwap(ask_price_list['close'], ask_price_list['volume'])
-        d_vwap1 = ask_price_list['d_vwap'].resample('1S').mean()
-        volume = ask_price_list['volume'].resample('1S').sum()
+        d_vwap1 = ask_price_list['d_vwap'].resample('10S').mean()
+        volume = ask_price_list['volume'].resample('10S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('1S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('10S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
