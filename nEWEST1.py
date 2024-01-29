@@ -1161,14 +1161,12 @@ def make_model(dataset, symbol, side):
                 
 
                 limit_order(symbol=symbol, 
-                            limit_price=limit_price, 
-                            side=side, 
-                            take_profit = take_profit,
-                            stop_loss = stop_loss,
-                            stop_loss_limit = stop_loss_limit,
-                            qty = 100,
-                            inventory_risk = get_inventory_risk(symbol=symbol)
-                            )
+                        limit_price=round(limit_price, 2),
+                        side=side, 
+                        take_profit = round(take_profit, 2),
+                        qty = 100,
+                        inventory_risk = get_inventory_risk(symbol = symbol)
+                        )
 
 
             if str(side) == 'OrderSide.SELL':
@@ -1188,14 +1186,12 @@ def make_model(dataset, symbol, side):
                 limit_price = round(current_price + spread, 2)
 
                 limit_order(symbol=symbol, 
-                            limit_price=limit_price, 
-                            side=side, 
-                            take_profit = take_profit,
-                            stop_loss = stop_loss,
-                            stop_loss_limit = stop_loss_limit,
-                            qty = 100,
-                            inventory_risk = get_inventory_risk(symbol=symbol)
-                            )
+                        limit_price=round(limit_price, 2),
+                        side=side, 
+                        take_profit = round(take_profit, 2),
+                        qty = 50,
+                        inventory_risk = get_inventory_risk(symbol = symbol)
+                        )
                 
 
         t1 = time.time()
