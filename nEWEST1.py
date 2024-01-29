@@ -359,15 +359,17 @@ def get_pricebook(symbol):
         bid_sum_delta_vol = 10000
         ask_sum_delta_vol = 10000
         midpoint = 999
-        print(traceback.format_exc()) 
+        print(traceback.format_exc())
+        return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
 
     finally:
 
         get_pricebook_previous = [ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint]
+        return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
     
 
 
-    return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
+    
 
 
 def get_inventory(symbol):
@@ -1051,8 +1053,8 @@ def make_model(dataset, symbol, side):
 
         
         #print('\n dataset: \n', dataset)
-        #print('\n after winsorize dataset: \n', dataset.describe())
-        #print('\n y: \n', y.describe())
+        print('\n after winsorize dataset: \n', dataset.describe())
+        print('\n y: \n', y)
         #print('\n y_sell: \n', y_sell.describe())
 
         #print('\n last dataset input: \n', dataset[-1:])
