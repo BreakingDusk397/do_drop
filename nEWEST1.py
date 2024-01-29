@@ -58,7 +58,7 @@ from scipy.signal import savgol_filter
 from scipy.signal import *
 
 pd.set_option("display.precision", 3)
-pd.set_option('display.max_rows', 20)
+pd.set_option('display.max_rows', 30)
 pd.set_option('display.max_columns', 10)
 pd.set_option('display.width', 100)
 
@@ -183,7 +183,7 @@ async def calibrate_params(symbol):
         try:    
             #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
             midpoint = current_vwap
-            for i in range(1,7):
+            for i in range(1,5):
 
                 market_order_data = LimitOrderRequest(
                                 symbol=symbol,
@@ -209,7 +209,7 @@ async def calibrate_params(symbol):
 
             for i in order_id_list_buy:
                 order = pd.DataFrame(trading_client.get_order_by_client_id(i))
-                #print("\n order: \n", order)
+                print("\n order: \n", order)
                 order_begin = order[1][2]
                 order_end = order[1][5]
 
@@ -217,7 +217,10 @@ async def calibrate_params(symbol):
                     duration = 100
                 else:
                     duration = order_end - order_begin
-                duration_buy.append(float(duration))
+
+                if duration == None:
+                    duration = 100
+                duration_buy.append(str(duration))
 
                 """
                 market_order_data = LimitOrderRequest(
@@ -263,6 +266,9 @@ async def calibrate_params(symbol):
             
             X = order_i_list_buy.reverse()
             y = duration_buy.reverse()
+
+            print(X)
+            print(y)
 
             X = X.replace([np.inf, -np.inf], np.nan)
             X = X.fillna(100)
@@ -1271,8 +1277,8 @@ async def create_model(data):
     
     
 
-    asyncio.gather(calibrate_params("IWM"))
-    asyncio.gather(take_profit_method("IWM"))
+    #asyncio.gather(calibrate_params("IWM"))
+    #asyncio.gather(take_profit_method("IWM"))
     
 
 
