@@ -181,7 +181,8 @@ async def calibrate_params(symbol):
         global k
 
         try:    
-            ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
+            #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
+            midpoint = current_vwap
             for i in range(1,7):
 
                 market_order_data = LimitOrderRequest(
@@ -1215,6 +1216,7 @@ now = datetime.now()
 ask_price_list = pd.DataFrame()
 ask_price_list5 = pd.DataFrame()
 ask_price_list_AMD5 = pd.DataFrame()
+current_vwap = 200
 # async handler
 async def trade_data_handler(data):
     # quote data will arrive here
@@ -1234,6 +1236,7 @@ async def trade_data_handler(data):
         volume = df[1][4]
         global ask_price_list
         global ask_price_list3
+        global current_vwap
         
         d = {'close':[ask_price],'volume':[volume]}
         
@@ -1251,7 +1254,7 @@ async def trade_data_handler(data):
 
 
         ask_price_list3 = ask_price_list3.ffill()
-
+        current_vwap = float(ask_price_list3['d_vwap'][-1:])
 
         #print('\n ask_price_list_IWM: \n', ask_price_list3)
         elapsed_time = time.process_time() - t
