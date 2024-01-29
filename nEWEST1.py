@@ -182,7 +182,7 @@ async def calibrate_params(symbol):
 
         try:    
             ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
-            for i in range(1,8):
+            for i in range(1,7):
 
                 market_order_data = LimitOrderRequest(
                                 symbol=symbol,
@@ -191,14 +191,12 @@ async def calibrate_params(symbol):
                                 type='limit',
                                 time_in_force=TimeInForce.GTC,
                                 limit_price = round((float(midpoint) - float(i)/100.0), 2),
-                                #take_profit={'limit_price': round((limit_price+ (spread*take_profit_multiplier)), 2)},
-                                #stop_loss={'stop_price': round((limit_price+ (spread*loss_stop_multiplier)), 2),
-                                #'limit_price':  round((limit_price+ (spread*loss_limit_multiplier)), 2)},
+                                
                                 
                             )
                 limit_order_data = trading_client.submit_order(market_order_data)
                 
-                time.sleep(2)
+                time.sleep(4)
 
             time.sleep(60)
             limit_order_data = pd.DataFrame(limit_order_data)
@@ -256,7 +254,11 @@ async def calibrate_params(symbol):
             print("\n Calculated parameters for ", symbol, " selling side: ", popt_sell)
             """
 
-
+            X = X.replace([np.inf, -np.inf], np.nan)
+            X = X.fillna(100)
+            y = y.replace([np.inf, -np.inf], np.nan)
+            y = y.fillna(100)
+            
             X = order_i_list_buy.reverse()
             y = duration_buy.reverse()
             popt, pcov = curve_fit(exp_decay, X, y, p0=(1,1,1))
@@ -499,14 +501,14 @@ async def take_profit_method(symbol):
             cancel_orders_for_symbol(symbol)
             
 
-            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.05:
+            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
                 cancel_orders_for_symbol(symbol=symbol)
                 
                 trading_client.close_position(symbol)
 
             
             
-            if float(ORDERS[1][12]) >=  5:
+            if float(ORDERS[1][12]) >=  6:
                 
                 cancel_orders_for_symbol(symbol=symbol)
                 
@@ -571,7 +573,7 @@ async def take_profit_method(symbol):
 
 order_list = []
 
-def limit_order(symbol, limit_price, side, take_profit, stop_loss, stop_loss_limit, qty, inventory_risk):
+def limit_order(symbol, limit_price, side, take_profit, qty, inventory_risk):
     global order_list
     symbol = str(symbol)
     
@@ -579,13 +581,12 @@ def limit_order(symbol, limit_price, side, take_profit, stop_loss, stop_loss_lim
                     symbol=symbol,
                     qty=int(qty),
                     side=side,
-                    type='bracket',
+                    type='limit',
+                    order_class = OrderClass.BRACKET,
                     time_in_force=TimeInForce.GTC,
                     limit_price = round(limit_price, 2),
-                    take_profit={'limit_price': round(take_profit, 2)},
-                    stop_loss={'stop_price': round((stop_loss), 2),
-                    'limit_price':  round((stop_loss_limit), 2)},
-                    
+                    take_profit=TakeProfitRequest(limit_price=round(take_profit, 2)),
+                    #stop_loss=StopLossRequest(stop_price = round(stop_loss, 2))
                 )
     limit_order_data = trading_client.submit_order(market_order_data)
 
@@ -664,6 +665,9 @@ def cancel_orders_for_side(symbol, side):
 
 def match_orders_for_symbol(symbol):
 
+    qty = 1
+
+
     try:
         symbol = symbol
         trading_client = TradingClient(A_KY, S_KY, paper=True)
@@ -679,26 +683,24 @@ def match_orders_for_symbol(symbol):
 
             cancel_orders_for_side(symbol=symbol, side='buy')
             limit_order(symbol=symbol, 
-                        spread=-0.021 + float(best_bid),
+                        limit_price=round((-0.021 + float(best_bid)), 2),
                         side=OrderSide.BUY, 
-                        take_profit_multiplier = 2,
-                        loss_stop_multiplier = 2,
-                        loss_limit_multiplier = 2.1,
-                        qty = abs(float(ORDERS[1][20])),
+                        take_profit = round((-0.021 + (float(best_bid) * 3)), 2),
+                        qty = abs(qty),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
+
+            
         
 
         if str(side) == 'PositionSide.LONG':
             
             cancel_orders_for_side(symbol=symbol, side='sell')
             limit_order(symbol=symbol, 
-                        spread=0.021 + float(best_ask), 
+                        limit_price=round((0.021 + float(best_bid)), 2),
                         side=OrderSide.SELL, 
-                        take_profit_multiplier = 2,
-                        loss_stop_multiplier = 2,
-                        loss_limit_multiplier = 2.1,
-                        qty = abs(float(ORDERS[1][20])),
+                        take_profit = round((-0.021 + (float(best_bid) * 3)), 2),
+                        qty = abs(qty),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
         
@@ -1097,7 +1099,7 @@ def make_model(dataset, symbol, side):
             
         }
         tscv = TimeSeriesSplit(n_splits=3, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=25, max_resources=500, cv=tscv, verbose=1, scoring='recall')
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=25, max_resources=500, cv=tscv, verbose=1, scoring='f1')
 
         rscv.fit(X_test2, y_test2)
 
