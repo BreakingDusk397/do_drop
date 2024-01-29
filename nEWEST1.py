@@ -211,8 +211,12 @@ async def calibrate_params(symbol):
                 #print("\n order: \n", order)
                 order_begin = order[1][2]
                 order_end = order[1][5]
-                duration = order_end - order_begin
-                duration_buy.append(duration)
+
+                if order_end == None:
+                    duration = 100
+                else:
+                    duration = order_end - order_begin
+                duration_buy.append(float(duration))
 
                 """
                 market_order_data = LimitOrderRequest(
@@ -254,13 +258,15 @@ async def calibrate_params(symbol):
             print("\n Calculated parameters for ", symbol, " selling side: ", popt_sell)
             """
 
+            
+            
+            X = order_i_list_buy.reverse()
+            y = duration_buy.reverse()
+
             X = X.replace([np.inf, -np.inf], np.nan)
             X = X.fillna(100)
             y = y.replace([np.inf, -np.inf], np.nan)
             y = y.fillna(100)
-            
-            X = order_i_list_buy.reverse()
-            y = duration_buy.reverse()
             popt, pcov = curve_fit(exp_decay, X, y, p0=(1,1,1))
 
             
@@ -712,7 +718,7 @@ def match_orders_for_symbol(symbol):
         pass
 
     finally:
-        print("\n Current", qty, side, "positions have been matched. \n")
+        print("\n Current", qty, "positions have been matched. \n")
 
 
 
@@ -1234,10 +1240,10 @@ async def trade_data_handler(data):
         
         ask_price_list = pd.concat([ask_price_list, row])
         ask_price_list['d_vwap'] = d_vwap(ask_price_list['close'], ask_price_list['volume'])
-        d_vwap1 = ask_price_list['d_vwap'].resample('10S').mean()
-        volume = ask_price_list['volume'].resample('10S').sum()
+        d_vwap1 = ask_price_list['d_vwap'].resample('5S').mean()
+        volume = ask_price_list['volume'].resample('5S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('10S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('5S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
