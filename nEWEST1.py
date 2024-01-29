@@ -868,9 +868,9 @@ def create_features(dataset):
         for i in dataset.columns.tolist():
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
             #dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
-            dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            #dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            dataset[str(i)+'_smooth_60'] = dataset[i].rolling(60).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            #dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            #dataset[str(i)+'_smooth_60'] = dataset[i].rolling(60).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
@@ -1054,8 +1054,8 @@ def make_model(dataset, symbol, side):
 
         
         #print('\n dataset: \n', dataset)
-        print('\n after winsorize dataset: \n', dataset.describe())
-        print('\n y: \n', y)
+        #print('\n after winsorize dataset: \n', dataset.describe())
+        #print('\n y: \n', y)
         #print('\n y_sell: \n', y_sell.describe())
 
         #print('\n last dataset input: \n', dataset[-1:])
@@ -1271,8 +1271,8 @@ async def create_model(data):
     
     
 
-    #asyncio.gather(calibrate_params("IWM"))
-    #asyncio.gather(take_profit_method("IWM"))
+    asyncio.gather(calibrate_params("IWM"))
+    asyncio.gather(take_profit_method("IWM"))
     
 
 
