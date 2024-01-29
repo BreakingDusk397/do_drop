@@ -588,7 +588,7 @@ async def take_profit_method(symbol):
 
 order_list = []
 
-def limit_order(symbol, limit_price, side, take_profit, qty, inventory_risk):
+def limit_order(symbol, limit_price, side, take_profit, stop_loss, qty, inventory_risk):
     global order_list
     symbol = str(symbol)
     
@@ -601,7 +601,7 @@ def limit_order(symbol, limit_price, side, take_profit, qty, inventory_risk):
                     time_in_force=TimeInForce.GTC,
                     limit_price = round(limit_price, 2),
                     take_profit=TakeProfitRequest(limit_price=round(take_profit, 2)),
-                    #stop_loss=StopLossRequest(stop_price = round(stop_loss, 2))
+                    stop_loss=StopLossRequest(stop_price = round(stop_loss, 2))
                 )
     limit_order_data = trading_client.submit_order(market_order_data)
 
@@ -700,7 +700,8 @@ def match_orders_for_symbol(symbol):
             limit_order(symbol=symbol, 
                         limit_price=round((-0.021 + float(best_bid)), 2),
                         side=OrderSide.BUY, 
-                        take_profit = round((-0.021 + (float(best_bid) * 3)), 2),
+                        take_profit = round((0.021 + (float(abs(best_bid)) * 3)), 2),
+                        stop_loss = round((-0.021 + (float(abs(best_bid)) * 3)), 2),
                         qty = abs(qty),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
@@ -715,6 +716,7 @@ def match_orders_for_symbol(symbol):
                         limit_price=round((0.021 + float(best_bid)), 2),
                         side=OrderSide.SELL, 
                         take_profit = round((-0.021 + (float(best_bid) * 3)), 2),
+                        stop_loss = round((0.021 + (float(abs(best_bid)) * 3)), 2),
                         qty = abs(qty),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
@@ -1164,6 +1166,7 @@ def make_model(dataset, symbol, side):
                         limit_price=round(limit_price, 2),
                         side=side, 
                         take_profit = round(take_profit, 2),
+                        stop_loss = round(stop_loss , 2),
                         qty = 100,
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
@@ -1189,6 +1192,7 @@ def make_model(dataset, symbol, side):
                         limit_price=round(limit_price, 2),
                         side=side, 
                         take_profit = round(take_profit, 2),
+                        stop_loss = round(stop_loss , 2),
                         qty = 50,
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
