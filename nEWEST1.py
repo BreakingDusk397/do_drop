@@ -685,7 +685,7 @@ def match_orders_for_symbol(symbol):
     spread = -0.02
     cancel_orders_for_side(symbol=symbol, side='sell')
     best_spread = best_bid
-    stop_loss = res - (best_spread * 3)
+    stop_loss = res - (best_spread * 10)
     stop_loss_limit = stop_loss - 0.01
     take_profit = res + (best_spread * 3)
     if float(best_spread) > -0.01:
@@ -699,6 +699,13 @@ def match_orders_for_symbol(symbol):
         symbol = symbol
         trading_client = TradingClient(A_KY, S_KY, paper=True)
         ORDERS = trading_client.get_open_position(symbol)
+
+    except:    
+        print("\n match_orders_for_symbol() exception, probably no inventory present. \n")  
+        print(traceback.format_exc())   
+        pass
+
+    else:
         ORDERS = pd.DataFrame(ORDERS)
         #print('\n ORDERS: \n',ORDERS)
         side = str(ORDERS[1][7])
@@ -732,16 +739,12 @@ def match_orders_for_symbol(symbol):
                         qty = abs(qty),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
+            
+            print("\n Current", qty, "positions have been matched. \n")
         
-        
-
-    except:    
-        print("\n match_orders_for_symbol() exception, probably no inventory present. \n")  
-        print(traceback.format_exc())   
-        pass
 
     finally:
-        print("\n Current", qty, "positions have been matched. \n")
+        print(f'\n match_orders_for_symbol: {symbol} (a finally block thats always executed)')
 
 
 
@@ -1163,7 +1166,7 @@ def make_model(dataset, symbol, side):
                 spread = -0.02
                 cancel_orders_for_side(symbol=symbol, side='sell')
                 best_spread = best_bid
-                stop_loss = res - (best_spread * 3)
+                stop_loss = res - (best_spread * 10)
                 stop_loss_limit = stop_loss - 0.01
                 take_profit = res + (best_spread * 3)
                 if float(best_spread) > -0.01:
@@ -1190,7 +1193,7 @@ def make_model(dataset, symbol, side):
                 spread = 0.02
                 cancel_orders_for_side(symbol=symbol, side='buy')
                 best_spread = best_ask
-                stop_loss = res + (best_spread * 3)
+                stop_loss = res + (best_spread * 10)
                 stop_loss_limit = stop_loss + 0.01
                 take_profit = res - (best_spread * 3)
                 
@@ -1349,4 +1352,16 @@ async def g():
     r = await f()
     return r
 
+
+
+try:
+       # Some Code.... 
+except:
+       # optional block
+       # Handling of exception (if required)
+else:
+       # execute if no exception
+finally:
+      # Some code .....(always executed)
+    
 """
