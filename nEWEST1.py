@@ -451,10 +451,10 @@ def get_inventory_risk(symbol):
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "IWM":
-            inventory_risk = 0.02 / abs(inventory_qty)
+            inventory_risk = 0.02 * abs(inventory_qty)
 
         if symbol == 'SPY':
-            inventory_risk = 0.02 / abs(inventory_qty)
+            inventory_risk = 0.02 * abs(inventory_qty)
 
     except:
 
@@ -849,7 +849,7 @@ def create_features(dataset):
         dataset['ask_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) - (2 * dataset['inventory'] - 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
         
 
-
+        # ((1 / g * log(1 + g / k) + (  mu / (g * s **2) - (2 * i - 1) / 2) * sqrt((s**2 * k) / (2 *k * a) * (1 + g / k)**(1 + k / g))) 
         # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
         dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
 
