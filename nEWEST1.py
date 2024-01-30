@@ -65,7 +65,7 @@ pd.set_option('display.width', 100)
 print(datetime.now())
 
 
-
+res = 0
 column_price = 'open'
 column_high = 'high'
 column_low = 'low'
@@ -682,6 +682,18 @@ def match_orders_for_symbol(symbol):
 
     qty = 1
 
+    spread = -0.02
+    cancel_orders_for_side(symbol=symbol, side='sell')
+    best_spread = best_bid
+    stop_loss = res - (best_spread * 3)
+    stop_loss_limit = stop_loss - 0.01
+    take_profit = res + (best_spread * 3)
+    if float(best_spread) > -0.01:
+        best_spread = best_spread + -0.05
+
+    spread = best_spread
+    current_price = res
+    limit_price = round(current_price + spread, 2)
 
     try:
         symbol = symbol
@@ -889,6 +901,7 @@ def create_features(dataset):
 def make_model(dataset, symbol, side):
     global best_ask
     global best_bid
+    global res
     try: 
         t0 = time.time()
 
