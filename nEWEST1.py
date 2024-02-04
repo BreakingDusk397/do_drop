@@ -1,7 +1,43 @@
+# Tristan Orndoff
+# 
+# Here is my semi-automated market making bot based off of "High-frequency trading in a limit order book" by Marco Avellaneda and Sasha Stoikov (2008) and,
+#  "Dealing with the Inventory Risk. A solution to the market making problem" by Olivier Guéant, Charles-Albert Lehalle, and Joaquin Fernandez Tapia (2012).
+# It utilizes the reference price concept put forth by Avellaneda and Stoikov and the solutions to the inventory control problem from Guéant, Lehalle, and Tapia. 
+# I did this because this project has been, and will always be a work in progress that I do in my free time. 
+# It's an evolution of my learning and a product of my preference for agile development. 
+# Therefore, I have created a Frankenstien, an amalgamation of my code looked over many nights. 
+#
+# This program has been designed to be automatically uploaded from my Github repo. 
+# to a DigitalOcean droplet through a bash script ran on my local computer before work in the morning.
+# The bash script uses the DigitalOCean API to instantly create a unique doplet with my credentials, 
+# then utilizes ssh commands to connect to my Github repo. and dowloand the current version of this program.
+# It downloads the require packages and initializes this python script. The script runs in a loop until 9am EST, 
+# It starts the background async methods (calibrate_params and take_profit_method.)
+# After that it connects to the Alpaca data stream for the given symbols, currently only "IWM", and runs the trading loop until close.
+#
+#
+#
+#
+# The trading loop logic is: 
+#                           Raw Data Input -> Resampled Data -> Model Creation, Training, and Prediction ------------------------> Order Placement and Matching ------------------------v
+#                                                                     ^                                      |                                                                          |       
+#                                                                     |                                      |-If there's no predicted change, the loop goes back to model creation     |      
+#                                                                     |                                      |                                                                          |   
+#                                                                     |<-----------------------------------< v <----------------------------------------------------------------------< v
+#
+#
+# To Do: 
+# Fix A and k background calibration
+# Set up the bash script on it's own droplet so that I don't have to do anything in the mornings
+#
+#
+#
+#
+#
+#
+# Necessary packages to import
 import datetime
 import traceback
-
-
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import HalvingRandomSearchCV
@@ -13,7 +49,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from matplotlib import cm, pyplot as plt
-
 import scipy
 from scipy.optimize import curve_fit
 import yfinance as yf
@@ -37,7 +72,6 @@ from alpaca.trading.requests import LimitOrderRequest
 import yfinance as yf
 import warnings
 import math
-
 from alpaca.trading.models import *
 import time
 import robin_stocks.robinhood as r
@@ -50,27 +84,25 @@ from sklearn import metrics
 from sklearn.model_selection import TimeSeriesSplit
 import asyncio
 import warnings
+from alpaca.data.live import StockDataStream, CryptoDataStream
 warnings.filterwarnings('ignore')
-import numba
+import numba as nb
 from numba import jit
-
 from scipy.signal import savgol_filter
 from scipy.signal import *
-
 pd.set_option("display.precision", 3)
 pd.set_option('display.max_rows', 30)
 pd.set_option('display.max_columns', 10)
 pd.set_option('display.width', 100)
-
 print(datetime.now())
 
-
+# Required initial values
 res = 0
 column_price = 'open'
 column_high = 'high'
 column_low = 'low'
 column_volume = 'volume'
-
+current_variance = 0.3
 midpoint_SPY = 0
 midpoint_IWM = 0
 midpoint_AMD = 0
@@ -85,7 +117,7 @@ ask_sum_delta_vol = 10000
 previous_df = 0
 df_orderbook = 0
 a = 0.5
-k = 0.5
+k = 0.3
 dataset = pd.DataFrame()
 df = pd.DataFrame()
 data_in = pd.DataFrame()
@@ -98,26 +130,31 @@ price_deviation_period = 15
 volume_deviation_period = 15
 yf_download_previous = 0
 
+
+
+now = datetime.now()
+ask_price_list = pd.DataFrame()
+ask_price_list5 = pd.DataFrame()
+ask_price_list_AMD5 = pd.DataFrame()
+current_vwap = 200
 symbol = "IWM"
 BASE_URL = "https://paper-api.alpaca.markets"
-A_KY = "PKCSSHRBEDBBETRCTIC0"
-S_KY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
-
+A_KY = "alpaca paper trading account key"
+S_KY = "alpaca secret key"
+wss_client = StockDataStream(A_KY, S_KY)
 trading_client = TradingClient(A_KY, S_KY, paper=True)
-
 symbol = symbol
-totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
-#print("Current OTP:", totp)
-
-un = "torndoff@icloud.com"
-pw = "qu2t3f8Ew9BxM"
-
+rh_key = "robinhood key"
+totp  = pyotp.TOTP(rh_key).now()
+un = "your robinhood login username"
+pw = "robinhood password"
 login = r.login(un,pw, mfa_code=totp)
 
 
 
-import numba as nb
 
+
+# Fast RSI Calculator
 @nb.jit(fastmath=True, nopython=True, cache=True)   
 def calc_rsi( array, deltas, avg_gain, avg_loss, n ):
 
@@ -137,7 +174,7 @@ def calc_rsi( array, deltas, avg_gain, avg_loss, n ):
 
     return array
 
-
+# Fast RSI Calculator
 @jit(cache=True) 
 def get_rsi( array, n = 14 ):   
 
@@ -155,30 +192,39 @@ def get_rsi( array, n = 14 ):
 
 
 
-
+# Fast VWAP for OHLC data
 @jit(cache=True)
 def np_vwap(h,l,v):
     return np.cumsum(v*(h+l)/2) / np.cumsum(v)
 
+# Fast VWAP for 1D prices
 @jit(cache=True)
 def d_vwap(c,v):
     return np.cumsum(v*c) / np.cumsum(v)
 
+# Fast exponential decay used for calibrating A and k
 @jit(cache=True, nopython=True)
 def exp_decay(k,A,delta,c):
     return A * np.exp(-k * delta) + c
 
+# A looped async function that will place n-orders away from the midpoint, log the time until hit, and fit the data to an exponential decay curve.
+# This will give us the variables A and k for the optimal bid and ask spread
+# Currently not working as intended
 async def calibrate_params(symbol):
     while True:
+
+        # Set variables
         order_id_list_buy = []
         order_id_list_sell = []
         order_i_list_buy = []
         order_i_list_sell = []
         duration_buy = []
         duration_sell = []
-
+        
+        # Allow the local variable to be set as the global variable to be used later on
         global a
         global k
+
 
         try:    
             #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
@@ -221,7 +267,8 @@ async def calibrate_params(symbol):
                 if duration == None:
                     duration = 100
                 duration_buy.append(str(duration))
-
+                
+                # The sell side of the calibration problem that is depreciated until I can get the buy side working as intended.
                 """
                 market_order_data = LimitOrderRequest(
                                 symbol=symbol,
@@ -289,8 +336,8 @@ async def calibrate_params(symbol):
 
         await asyncio.sleep(300)
 
-
-def yf_download():
+# Downloads price data from yahoo finance
+def yf_download(symbol):
     global yf_download_previous
 
     try:
@@ -302,6 +349,7 @@ def yf_download():
     except:
         return yf_download_previous
 
+# Connects to Robinhood's API and extracts Lvl 2 orderbook data
 def get_pricebook(symbol):
 
 
@@ -361,8 +409,8 @@ def get_pricebook(symbol):
         
 
     except:
-        ask_alpha = 0.05
-        bid_alpha = 0.05
+        ask_alpha = 0.5
+        bid_alpha = 0.5
         bid_sum_delta_vol = 10000
         ask_sum_delta_vol = 10000
         midpoint = 999
@@ -378,7 +426,8 @@ def get_pricebook(symbol):
 
     
 
-
+# Retrieves current inventory position for a given symbol from Alpaca
+# Preferred return inventory method
 def get_inventory(symbol):
 
     t = time.process_time()
@@ -415,7 +464,7 @@ def get_inventory(symbol):
 
 
 
-
+# Calculates the current remaining time until the trading session closes
 def get_time_til_close(symbol):
 
     try:
@@ -433,9 +482,9 @@ def get_time_til_close(symbol):
         print("get_time_til_close exception. It's not trading time...")
         #print(traceback.format_exc())
         
-    
+# Calculates the inventory risk (aka gamma or ) for any given symbol
 def get_inventory_risk(symbol):
-    inventory_risk = 0.002
+    inventory_risk = 0.02
     try:
         inventory_qty = 1
         symbol = str(symbol)
@@ -451,10 +500,10 @@ def get_inventory_risk(symbol):
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "IWM":
-            inventory_risk = 0.02 * abs(inventory_qty)
+            inventory_risk = 0.1 * (abs(inventory_qty)/10) * (current_variance - current_variance.min() / current_variance.max() - current_variance.min())
 
         if symbol == 'SPY':
-            inventory_risk = 0.02 * abs(inventory_qty)
+            inventory_risk = 0.01 * abs(inventory_qty)
 
     except:
 
@@ -464,6 +513,7 @@ def get_inventory_risk(symbol):
         #print(traceback.format_exc())
         
         
+        
     finally:
             print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
             
@@ -471,7 +521,8 @@ def get_inventory_risk(symbol):
 
     return inventory_risk
 
-
+# Retrieves current inventory position for a given symbol from Alpaca
+# Old and depreciated.
 def get_open_position(symbol):
 
     try:
@@ -502,7 +553,8 @@ def get_open_position(symbol):
 
 
 
-
+# A looped, background async method that checks the total, current profit for a given symbol every three seconds
+# and closes it with market orders if above a certain threshold.
 async def take_profit_method(symbol):
     while True:
         try:
@@ -531,7 +583,7 @@ async def take_profit_method(symbol):
                 
 
             
-                
+            # Depreciated stop-loss closing conditions
             """
             if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.12:
                 cancel_orders_for_symbol(symbol=symbol)
@@ -588,6 +640,7 @@ async def take_profit_method(symbol):
 
 order_list = []
 
+# Sends a bracket, limit order including a loose stop-loss and a tight take-profit through Alpaca
 def limit_order(symbol, limit_price, side, take_profit, stop_loss, qty, inventory_risk):
     global order_list
     symbol = str(symbol)
@@ -624,7 +677,7 @@ def limit_order(symbol, limit_price, side, take_profit, stop_loss, qty, inventor
     
 
     
-
+# Cancels all orders for both BUY and SELL sides for a given symbol
 def cancel_orders_for_symbol(symbol):
 
     try:
@@ -651,6 +704,7 @@ def cancel_orders_for_symbol(symbol):
         #print(traceback.format_exc())
         
 
+# Cancels all orders for one BUY or SELL side for a given symbol
 def cancel_orders_for_side(symbol, side):
 
     try:
@@ -677,23 +731,12 @@ def cancel_orders_for_side(symbol, side):
         #print(traceback.format_exc())
         pass
 
-
+# Matches current, available positions with limit orders
 def match_orders_for_symbol(symbol):
 
     qty = 1
 
-    spread = -0.02
-    cancel_orders_for_side(symbol=symbol, side='sell')
-    best_spread = best_bid
-    stop_loss = res - (best_spread * 10)
-    stop_loss_limit = stop_loss - 0.01
-    take_profit = res + (best_spread * 3)
-    if float(best_spread) > -0.01:
-        best_spread = best_spread + -0.05
-
-    spread = best_spread
-    current_price = res
-    limit_price = round(current_price + spread, 2)
+    
 
     try:
         symbol = symbol
@@ -715,15 +758,31 @@ def match_orders_for_symbol(symbol):
 
         if str(side) == 'PositionSide.SHORT':
 
+            spread = -0.02
+            #cancel_orders_for_side(symbol=symbol, side='sell')
+            best_spread = best_bid
+            stop_loss = round((res + (best_spread * 10)), 2)
+            stop_loss_limit = round((stop_loss - 0.01), 2)
+            take_profit = round((res - (best_spread * 3)), 2)
+            if float(best_spread) > -0.01:
+                best_spread = round((best_spread - 0.05), 2)
+
+            spread = round(best_spread, 2)
+            current_price = round(res, 2)
+            limit_price = round((current_price + spread), 2)
+
             cancel_orders_for_side(symbol=symbol, side='buy')
-            limit_order(symbol=symbol, 
-                        limit_price=round((-0.021 + float(best_bid)), 2),
-                        side=OrderSide.BUY, 
-                        take_profit = round((0.021 + (float(abs(best_bid)) * 3)), 2),
-                        stop_loss = round((-0.021 + (float(abs(best_bid)) * 3)), 2),
-                        qty = abs(qty),
-                        inventory_risk = get_inventory_risk(symbol = symbol)
-                        )
+            
+            for i in np.linspace(1, qty, num=10):
+                limit_order(symbol=symbol, 
+                            limit_price= round((limit_price - float(i)), 2),
+                            side=OrderSide.BUY, 
+                            take_profit = round((limit_price - float(i)), 2),
+                            stop_loss = round((limit_price + float(i)), 2),
+                            qty = abs(i),
+                            inventory_risk = get_inventory_risk(symbol = symbol)
+                            )
+            print("\n Current", qty, side, "positions have been matched. \n")
 
             
         
@@ -731,23 +790,38 @@ def match_orders_for_symbol(symbol):
         if str(side) == 'PositionSide.LONG':
             
             cancel_orders_for_side(symbol=symbol, side='sell')
-            limit_order(symbol=symbol, 
-                        limit_price=round((0.021 + float(best_bid)), 2),
-                        side=OrderSide.SELL, 
-                        take_profit = round((-0.021 + (float(best_bid) * 3)), 2),
-                        stop_loss = round((0.021 + (float(abs(best_bid)) * 3)), 2),
-                        qty = abs(qty),
-                        inventory_risk = get_inventory_risk(symbol = symbol)
-                        )
+
+            spread = -0.02
+            #cancel_orders_for_side(symbol=symbol, side='sell')
+            best_spread = best_ask
+            stop_loss = round((res - (best_spread * 10)), 2)
+            stop_loss_limit = round((stop_loss + 0.01), 2)
+            take_profit = round((res + (best_spread * 3)), 2)
+            if float(best_spread) < -0.01:
+                best_spread = round((best_spread + 0.05), 2)
+
+            spread = round(best_spread, 2)
+            current_price = round(res, 2)
+            limit_price = round((current_price + spread), 2)
+
+            for i in np.linspace(1, qty, num=10):
+                limit_order(symbol=symbol, 
+                            limit_price= round((limit_price + float(i)), 2),
+                            side=OrderSide.SELL, 
+                            take_profit = round((limit_price + float(i)), 2),
+                            stop_loss = round((limit_price - float(i)), 2),
+                            qty = abs(i),
+                            inventory_risk = get_inventory_risk(symbol = symbol)
+                            )
             
-            print("\n Current", qty, "positions have been matched. \n")
+            print("\n Current", qty, side, "positions have been matched. \n")
         
 
     finally:
         print(f'\n match_orders_for_symbol: {symbol} (a finally block thats always executed)')
 
 
-
+# Draws up a confusion matrix, accuracy, and F1 scores for validation data
 def metric(y_true, y_pred):
 
     Accuracy = metrics.accuracy_score(y_true, y_pred)
@@ -761,7 +835,7 @@ def metric(y_true, y_pred):
     cm_display.plot()
     plt.show()"""
 
-
+# Fast std calculator
 @jit(cache=True, nopython=True)
 def std_normalized(vals):
     return np.std(vals) / np.mean(vals)
@@ -776,17 +850,19 @@ def ma_ratio(vals):
 def values_deviation(vals):
     return (vals[-1] - np.mean(vals)) / np.std(vals)
 
+# Fast zscore calculator
 @jit(cache=True)
 def z_score(vals):
     vals = np.log(vals)
     vals = ((vals - vals.expanding().mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/vals.expanding().std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()
     return vals
 
-
+# A method for applying the z_score(vals) method to all columns in a dataframe
 def z_score_df(df):
     df = df.apply(lambda x : z_score(x))
     return df
 
+# Semi fast feature generator for features that won't be globally transmitted
 @jit(cache=True)
 def create_features(dataset):
 
@@ -804,6 +880,7 @@ def create_features(dataset):
         dataset['Volatility4'] = (np.log(dataset['Volatility3']).rolling(25).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(25))
         dataset['Volatility_ratio'] = dataset['Volatility'] / dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
 
+        dataset['trade-able spread'] = dataset['spread2'] - np.sqrt(8 * np.log(100) * dataset['Volatility'])
         
         dataset['last_return'] = np.log(dataset["open"]).pct_change()
         dataset['std_normalized'] = np.log(dataset[column_price]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
@@ -829,7 +906,10 @@ def create_features(dataset):
 
         dataset['spread'] = abs(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - ((np.log(dataset['low']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + np.log(dataset['high']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/2))
         dataset['variance'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-
+        dataset['open+var'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['open-var'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['open+var_diff'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open+var'].shift(1))
+        dataset['open+var_diff'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open-var'].shift(1))
         dataset['inventory'] = get_inventory(symbol)
         dataset["mu"] = abs((np.log(dataset["open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
 
@@ -858,7 +938,15 @@ def create_features(dataset):
 
         dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
 
+        s = dataset['sigma']
+        g = dataset['gamma']
+        k = dataset['k']
+        m = dataset['mu']
+        q = dataset['inventory']
+        a = dataset['bid_alpha']
 
+        dataset['inventory_risk_roc'] = (s**2 * (g/k + 1)**(k/g + 1)*((k/g + 1)/(k (g/k + 1)) - (k * np.log(g/k + 1))/g**2)*(m/(g * s**2) + 1/2 (1 - 2 * q)))/(2 * np.sqrt(2) * a * np.sqrt((s**2 (g/k + 1)**(k/g + 1))/a)) - (m * np.sqrt((s^2 (g/k + 1)**(k/g + 1))/a))/(np.sqrt(2) * g**2 * s**2) - np.log(g/k + 1)/g**2 + 1/(g * k (g/k + 1))
+        dataset['inventory derivative'] = -(np.sqrt(((1 + g/k)**(1 + k/g) * s**2)/a)/np.sqrt(2))
         #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
 
         #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
@@ -878,6 +966,15 @@ def create_features(dataset):
         for i in dataset.columns.tolist():
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["Volatility"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             """
+
+        from sklearn import linear_model
+        lr = linear_model.LinearRegression()
+
+        for i in dataset.columns.tolist():
+            y = dataset[i][-10:].values
+            X = range(len(y))
+            lr.fit(X,y)
+            dataset[i+'+1'] = lr.predict(len(y)+1)
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -901,10 +998,20 @@ def create_features(dataset):
 
         return dataset
 
+# The core logic behind creating a Catboost classifier that predicts the change in returns 
+# for a given future period (usually one time-step ahead). 
+# This includes calculating the target, y;
+# Collecting and normalizing all of the data inputs into a single array,
+# Training BUY and SELL models, cross-validating hyper-parameters, and predicting the next time-step,
+# Calculating optimal bids, asks, and reservation prices,
+# Sending limit orders if the model predicts a favorable trade
+# The sampling period isn't handled by this method.
 def make_model(dataset, symbol, side):
     global best_ask
     global best_bid
     global res
+    global current_variance
+
     try: 
         t0 = time.time()
 
@@ -949,8 +1056,14 @@ def make_model(dataset, symbol, side):
         dataset['midpoint'] = midpoint
         
 
-        dataset['bid_alpha'] = a
-        dataset['ask_alpha'] = a
+        dataset['bid_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
+        dataset['ask_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
+
+        dataset['k'] = np.log((dataset['bid_alpha'] * 1) / (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))
+
+        dataset['bid_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
+        dataset['ask_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
+
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -1183,7 +1296,7 @@ def make_model(dataset, symbol, side):
                         side=side, 
                         take_profit = round(take_profit, 2),
                         stop_loss = round(stop_loss , 2),
-                        qty = 100,
+                        qty = round((100 * (math.exp(-5((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019)))))),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
 
@@ -1209,7 +1322,7 @@ def make_model(dataset, symbol, side):
                         side=side, 
                         take_profit = round(take_profit, 2),
                         stop_loss = round(stop_loss , 2),
-                        qty = 50,
+                        qty = round((101 * (math.exp(-5((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019)))))),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
                 
@@ -1228,18 +1341,11 @@ def make_model(dataset, symbol, side):
 
 
 
-from alpaca.data.live import StockDataStream, CryptoDataStream
 
-A_KY = "PKCSSHRBEDBBETRCTIC0"
-S_KY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
-wss_client = StockDataStream(A_KY, S_KY)
 
-now = datetime.now()
-ask_price_list = pd.DataFrame()
-ask_price_list5 = pd.DataFrame()
-ask_price_list_AMD5 = pd.DataFrame()
-current_vwap = 200
-# async handler
+# This looped async method streams stock data from Alpaca at a trade level granularity
+# Each trade is logged and resampled into a given time-period, currently 5 second intervals 
+# Only three streams can be active at any given time
 async def trade_data_handler(data):
     # quote data will arrive here
     t = time.process_time()
@@ -1286,7 +1392,8 @@ async def trade_data_handler(data):
 
             
 
-
+# This method ties everything together. It is called after 9am EST on trading days and gives the resampled data from the Alpaca data stream 
+# to the concurrent.futures.ProcessPoolExecutor() to create parrallel models with. This has been designed with the intention of being easily scalable with more symbols
 async def create_model(data):
 
     t = time.process_time()
@@ -1322,6 +1429,7 @@ async def create_model(data):
     print('\n ------- Current Local Machine Time ------- \n', now1)
     match_orders_for_symbol(symbol='IWM')
 
+
 while True:
     now = datetime.now()
     print(now.hour, now.minute, now.second)
@@ -1339,29 +1447,3 @@ while True:
 
     
     #time.sleep(10)
-
-
-
-
-
-
-
-"""
-async def g():
-    # Pause here and come back to g() when f() is ready
-    r = await f()
-    return r
-
-
-
-try:
-       # Some Code.... 
-except:
-       # optional block
-       # Handling of exception (if required)
-else:
-       # execute if no exception
-finally:
-      # Some code .....(always executed)
-    
-"""
