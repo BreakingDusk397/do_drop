@@ -154,7 +154,7 @@ login = r.login(un,pw, mfa_code=totp)
 
 
 # Fast RSI Calculator
-@jit(fastmath=True, nopython=True, cache=True)   
+#@jit(fastmath=True, nopython=True, cache=True)   
 def calc_rsi( array, deltas, avg_gain, avg_loss, n ):
 
     # Use Wilder smoothing method
@@ -174,7 +174,7 @@ def calc_rsi( array, deltas, avg_gain, avg_loss, n ):
     return array
 
 # Fast RSI Calculator
-@jit(cache=True) 
+
 def get_rsi( array, n = 14 ):   
 
     deltas = np.append([0],np.diff(array))
@@ -200,7 +200,7 @@ def d_vwap(c,v):
     return np.cumsum(v*c) / np.cumsum(v)
 
 # Fast exponential decay used for calibrating A and k
-@jit(cache=True, nopython=True)
+#@jit(cache=True, nopython=True)
 def exp_decay(k,A,delta,c):
     return A * np.exp(-k * delta) + c
 
@@ -833,22 +833,22 @@ def metric(y_true, y_pred):
     plt.show()"""
 
 # Fast std calculator
-@jit(cache=True, nopython=True)
+#@jit(cache=True, nopython=True)
 def std_normalized(vals):
     return np.std(vals) / np.mean(vals)
 
 # Ratio of diff between last price and mean value to last price
-@jit(cache=True, nopython=True)
+#@jit(cache=True, nopython=True)
 def ma_ratio(vals):
     return (vals[-1] - np.mean(vals)) / vals[-1]
 
 # z-score for volumes and price
-@jit(cache=True, nopython=True)
+#@jit(cache=True, nopython=True)
 def values_deviation(vals):
     return (vals[-1] - np.mean(vals)) / np.std(vals)
 
 # Fast zscore calculator
-@jit(cache=True)
+#@jit(cache=True)
 def z_score(vals):
     vals = np.log(vals)
     vals = ((vals - vals.expanding().mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))/vals.expanding().std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()
