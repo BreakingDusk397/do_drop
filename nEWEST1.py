@@ -87,7 +87,7 @@ import asyncio
 import warnings
 from alpaca.data.live import StockDataStream, CryptoDataStream
 warnings.filterwarnings('ignore')
-import numba as nb
+
 from numba import jit
 from scipy.signal import savgol_filter
 from scipy.signal import *
@@ -154,7 +154,7 @@ login = r.login(un,pw, mfa_code=totp)
 
 
 # Fast RSI Calculator
-@nb.jit(fastmath=True, nopython=True, cache=True)   
+@jit(fastmath=True, nopython=True, cache=True)   
 def calc_rsi( array, deltas, avg_gain, avg_loss, n ):
 
     # Use Wilder smoothing method
