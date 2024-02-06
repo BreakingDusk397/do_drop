@@ -866,8 +866,8 @@ def create_features(dataset):
         
         #print(dataset)
         
-        dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0.0000001)
+        dataset = dataset[np.isfinite(dataset)]
+        dataset = dataset[np.isnan(dataset)]
 
         dataset['spread3'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
@@ -975,8 +975,8 @@ def create_features(dataset):
             lr.fit(X,y)
             dataset[i+'+1'] = lr.predict(len(y)+1)
 
-        dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0.0000001)
+        dataset = dataset[np.isfinite(dataset)]
+        dataset = dataset[np.isnan(dataset)]
 
         
         
@@ -988,8 +988,8 @@ def create_features(dataset):
             #dataset[str(i)+'_smooth_60'] = dataset[i].rolling(60).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         
 
-        dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0.0000001)
+        dataset = dataset[np.isfinite(dataset)]
+        dataset = dataset[np.isnan(dataset)]
 
         return dataset
 
