@@ -897,8 +897,8 @@ def create_features(dataset):
         dataset['OBV2'] = (np.sign(dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
         dataset['OBV3'] = (np.sign((dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
 
-        dataset['vwap'] = np_vwap(h= dataset['high'].values,l= dataset['low'].values,v= dataset['volume'].values)
-        dataset['D_vwap'] = d_vwap(c= dataset['open'].values,v= dataset['volume'].values)
+        #dataset['vwap'] = np_vwap(h= dataset['high'].values,l= dataset['low'].values,v= dataset['volume'].values)
+        #dataset['D_vwap'] = d_vwap(c= dataset['open'].values,v= dataset['volume'].values)
 
         dataset['rsi_open'] = get_rsi( dataset["open"], 14 )
         dataset['rsi_high'] = get_rsi( dataset["high"], 14 )
