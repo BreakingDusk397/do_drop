@@ -944,8 +944,8 @@ def create_features(dataset):
         q = dataset['inventory']
         a = dataset['bid_alpha']
 
-        dataset['inventory_risk_roc'] = (s**2 * (g/k + 1)**(k/g + 1)*((k/g + 1)/(k (g/k + 1)) - (k * np.log((g/k + 1)))/g**2)*(m/(g * s**2) + 1/2 (1 - 2 * q)))/(2 * np.sqrt(2) * a * np.sqrt((s**2 (g/k + 1)**(k/g + 1))/a)) - (m * np.sqrt(((s**2 (g/k + 1)**(k/g + 1))/a)))/(np.sqrt(2) * g**2 * s**2) - np.log((g/k + 1))/g**2 + 1/(g * k (g/k + 1))
-        dataset['inventory derivative'] = -(np.sqrt((((1 + g/k)**(1 + k/g) * s**2)/a))/np.sqrt(2))
+        #dataset['inventory_risk_roc'] = (s**2 * (g/k + 1)**(k/g + 1)*((k/g + 1)/(k (g/k + 1)) - (k * np.log((g/k + 1)))/g**2)*(m/(g * s**2) + 1/2 (1 - 2 * q)))/(2 * np.sqrt(2) * a * np.sqrt((s**2 (g/k + 1)**(k/g + 1))/a)) - (m * np.sqrt(((s**2 (g/k + 1)**(k/g + 1))/a)))/(np.sqrt(2) * g**2 * s**2) - np.log((g/k + 1))/g**2 + 1/(g * k (g/k + 1))
+        #dataset['inventory derivative'] = -(np.sqrt((((1 + g/k)**(1 + k/g) * s**2)/a))/np.sqrt(2))
         #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
 
         #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
