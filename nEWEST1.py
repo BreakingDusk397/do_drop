@@ -978,11 +978,7 @@ def create_features(dataset):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
 
-        for i in dataset.columns.tolist():
-            detrend(dataset[i], overwrite_data=True)
-
-        dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0.0000001)
+        
         
         for i in dataset.columns.tolist():
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
@@ -1124,6 +1120,11 @@ def make_model(dataset, symbol, side):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
         
+        for i in dataset.columns.tolist():
+            detrend(dataset[i], overwrite_data=True)
+
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
 
         #print('dataset: \n', dataset)
             
