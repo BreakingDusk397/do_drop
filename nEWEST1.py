@@ -76,6 +76,7 @@ from alpaca.trading.models import *
 import time
 import robin_stocks.robinhood as r
 from datetime import datetime
+from sklearn import linear_model
 import traceback
 import pyotp
 import catboost as cb
@@ -952,8 +953,8 @@ def create_features(dataset):
         q = dataset['inventory']
         a = dataset['bid_alpha']
 
-        dataset['inventory_risk_roc'] = (s**2 * (g/k + 1)**(k/g + 1)*((k/g + 1)/(k (g/k + 1)) - (k * np.log(g/k + 1))/g**2)*(m/(g * s**2) + 1/2 (1 - 2 * q)))/(2 * np.sqrt(2) * a * np.sqrt((s**2 (g/k + 1)**(k/g + 1))/a)) - (m * np.sqrt((s^2 (g/k + 1)**(k/g + 1))/a))/(np.sqrt(2) * g**2 * s**2) - np.log(g/k + 1)/g**2 + 1/(g * k (g/k + 1))
-        dataset['inventory derivative'] = -(np.sqrt(((1 + g/k)**(1 + k/g) * s**2)/a)/np.sqrt(2))
+        dataset['inventory_risk_roc'] = (s**2 * (g/k + 1)**(k/g + 1)*((k/g + 1)/(k (g/k + 1)) - (k * np.log((g/k + 1)))/g**2)*(m/(g * s**2) + 1/2 (1 - 2 * q)))/(2 * np.sqrt(2) * a * np.sqrt((s**2 (g/k + 1)**(k/g + 1))/a)) - (m * np.sqrt(((s**2 (g/k + 1)**(k/g + 1))/a)))/(np.sqrt(2) * g**2 * s**2) - np.log((g/k + 1))/g**2 + 1/(g * k (g/k + 1))
+        dataset['inventory derivative'] = -(np.sqrt((((1 + g/k)**(1 + k/g) * s**2)/a))/np.sqrt(2))
         #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
 
         #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
@@ -974,7 +975,7 @@ def create_features(dataset):
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["Volatility"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             """
 
-        from sklearn import linear_model
+        
         lr = linear_model.LinearRegression()
 
         for i in dataset.columns.tolist():
@@ -1303,7 +1304,7 @@ def make_model(dataset, symbol, side):
                         side=side, 
                         take_profit = round(take_profit, 2),
                         stop_loss = round(stop_loss , 2),
-                        qty = round((100 * (math.exp(-5((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019)))))),
+                        qty = round((100 * (math.exp((-5((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
 
@@ -1329,7 +1330,7 @@ def make_model(dataset, symbol, side):
                         side=side, 
                         take_profit = round(take_profit, 2),
                         stop_loss = round(stop_loss , 2),
-                        qty = round((101 * (math.exp(-5((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019)))))),
+                        qty = round((101 * (math.exp((-5((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
                 
