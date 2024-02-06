@@ -897,8 +897,8 @@ def create_features(dataset):
         dataset['OBV2'] = (np.sign(dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
         dataset['OBV3'] = (np.sign((dataset["open"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).diff()) * dataset['volume']).fillna(0.0000001).cumsum()
 
-        dataset['vwap'] = np_vwap(h= dataset['high'],l= dataset['low'],v= dataset['volume'])
-        dataset['D_vwap'] = d_vwap(c= dataset['open'],v= dataset['volume'])
+        dataset['vwap'] = np_vwap(h= dataset['high'].values,l= dataset['low'].values,v= dataset['volume'].values)
+        dataset['D_vwap'] = d_vwap(c= dataset['open'].values,v= dataset['volume'].values)
 
         dataset['rsi_open'] = get_rsi( dataset["open"], 14 )
         dataset['rsi_high'] = get_rsi( dataset["high"], 14 )
@@ -932,7 +932,7 @@ def create_features(dataset):
 
         #dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
         #dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
-        dataset['market_impact'] = dataset['sigma']*np.sqrt(dataset['inventory']/dataset['Volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
+        dataset['market_impact'] = dataset['sigma']*np.sqrt(dataset['inventory']/dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
         
 
         dataset['bid_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (2 * dataset['inventory'] + 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
@@ -1063,6 +1063,8 @@ def make_model(dataset, symbol, side):
         dataset['k'] = k
         dataset['midpoint'] = midpoint
         
+        dataset = dataset.apply(pd.to_numeric, downcast='float')
+        dataset = dataset.apply(pd.to_numeric, downcast='integer')
 
         dataset['bid_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
         dataset['ask_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
