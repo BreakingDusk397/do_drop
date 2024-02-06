@@ -190,13 +190,11 @@ def get_rsi( array, n = 14 ):
 
 
 
-# Fast VWAP for OHLC data
-@jit(cache=True)
+# VWAP for OHLC data
 def np_vwap(h,l,v):
     return np.cumsum(v*(h+l)/2) / np.cumsum(v)
 
-# Fast VWAP for 1D prices
-@jit(cache=True)
+# VWAP for 1D prices
 def d_vwap(c,v):
     return np.cumsum(v*c) / np.cumsum(v)
 
@@ -1442,6 +1440,22 @@ async def create_model(data):
 while True:
     now = datetime.now()
     print(now.hour, now.minute, now.second)
+
+    # If the time is between 8:30-9:00am EST start main and background logic loop
+    # I can never get && conditionals to work
+    if int(now.hour) == int(14):
+        if int(now.minute) >= 30:
+
+            print(now)
+            # Call your CODE() function here
+            asyncio.gather(calibrate_params("IWM"))
+            asyncio.gather(take_profit_method("IWM"))
+
+            wss_client.subscribe_trades(create_model, "IWM")
+
+            wss_client.run()
+    
+    # If the hour is past 9am EST start main and background logic loop
     if int(now.hour) >= int(15):
 
         print(now)
