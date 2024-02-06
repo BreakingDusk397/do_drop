@@ -866,8 +866,8 @@ def create_features(dataset):
         
         #print(dataset)
         
-        dataset = dataset[np.isfinite(dataset)]
-        dataset = dataset[np.isnan(dataset)]
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
 
         dataset['spread3'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
@@ -970,13 +970,13 @@ def create_features(dataset):
         lr = linear_model.LinearRegression()
 
         for i in dataset.columns.tolist():
-            y = dataset[i][-10:].to_numpy()
+            y = dataset[i][-10:].values
             X = range(len(y))
             lr.fit(X,y)
             dataset[i+'+1'] = lr.predict(len(y)+1)
 
-        dataset = dataset[np.isfinite(dataset)]
-        dataset = dataset[np.isnan(dataset)]
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
 
         
         
@@ -988,8 +988,8 @@ def create_features(dataset):
             #dataset[str(i)+'_smooth_60'] = dataset[i].rolling(60).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         
 
-        dataset = dataset[np.isfinite(dataset)]
-        dataset = dataset[np.isnan(dataset)]
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
 
         return dataset
 
@@ -1039,8 +1039,8 @@ def make_model(dataset, symbol, side):
 
 
 
-        dataset['vwap'] = np_vwap(h= dataset['high'].to_numpy(),l= dataset['low'].to_numpy(),v= dataset['volume'].to_numpy())
-        dataset['D_vwap'] = d_vwap(c= dataset['open'].to_numpy(),v= dataset['volume'].to_numpy())
+        dataset['vwap'] = np_vwap(h= dataset['high'].values,l= dataset['low'].values,v= dataset['volume'].values)
+        dataset['D_vwap'] = d_vwap(c= dataset['open'].values,v= dataset['volume'].values)
         dataset['inventory'] = get_inventory(symbol)
         dataset['gamma'] = get_inventory_risk(symbol = symbol)
 
@@ -1068,8 +1068,7 @@ def make_model(dataset, symbol, side):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
 
-        dataset = create_features(dataset.to_numpy())
-        dataset = pd.DataFrame(dataset)
+        dataset = create_features(dataset)
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -1129,8 +1128,7 @@ def make_model(dataset, symbol, side):
 
         #print('dataset: \n', dataset)
             
-        dataset = z_score_df(dataset.to_numpy())
-        dataset = pd.DataFrame(dataset)
+        dataset = z_score_df(dataset)
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         
         dataset = dataset.fillna(0.0000001)
@@ -1138,7 +1136,7 @@ def make_model(dataset, symbol, side):
         #print('\n after z_score percent dataset: \n', dataset.describe())
         index1 = dataset.index
         columns_list = dataset.columns.tolist()
-        dataset = winsorize(dataset.to_numpy(), limits=[0.05, 0.05], inplace=True, nan_policy='propagate')
+        dataset = winsorize(dataset.values, limits=[0.05, 0.05], inplace=True, nan_policy='propagate')
         dataset = pd.DataFrame(dataset, columns=columns_list, index=index1)
         #print('\n after winsorize dataset: \n', dataset)
         
