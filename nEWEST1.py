@@ -860,7 +860,7 @@ def z_score_df(df):
     return df
 
 # Semi fast feature generator for features that won't be globally transmitted
-@jit(cache=True)
+
 def create_features(dataset):
 
         
@@ -970,7 +970,7 @@ def create_features(dataset):
         lr = linear_model.LinearRegression()
 
         for i in dataset.columns.tolist():
-            y = dataset[i][-10:].values
+            y = dataset[i][-10:].to_numpy()
             X = range(len(y))
             lr.fit(X,y)
             dataset[i+'+1'] = lr.predict(len(y)+1)
@@ -1039,8 +1039,8 @@ def make_model(dataset, symbol, side):
 
 
 
-        dataset['vwap'] = np_vwap(h= dataset['high'].values,l= dataset['low'].values,v= dataset['volume'].values)
-        dataset['D_vwap'] = d_vwap(c= dataset['open'].values,v= dataset['volume'].values)
+        dataset['vwap'] = np_vwap(h= dataset['high'].to_numpy(),l= dataset['low'].to_numpy(),v= dataset['volume'].to_numpy())
+        dataset['D_vwap'] = d_vwap(c= dataset['open'].to_numpy(),v= dataset['volume'].to_numpy())
         dataset['inventory'] = get_inventory(symbol)
         dataset['gamma'] = get_inventory_risk(symbol = symbol)
 
@@ -1068,7 +1068,8 @@ def make_model(dataset, symbol, side):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
 
-        dataset = create_features(dataset)
+        dataset = create_features(dataset.to_numpy())
+        dataset = pd.DataFrame(dataset)
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -1128,7 +1129,8 @@ def make_model(dataset, symbol, side):
 
         #print('dataset: \n', dataset)
             
-        dataset = z_score_df(dataset)
+        dataset = z_score_df(dataset.to_numpy())
+        dataset = pd.DataFrame(dataset)
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         
         dataset = dataset.fillna(0.0000001)
@@ -1136,7 +1138,7 @@ def make_model(dataset, symbol, side):
         #print('\n after z_score percent dataset: \n', dataset.describe())
         index1 = dataset.index
         columns_list = dataset.columns.tolist()
-        dataset = winsorize(dataset.values, limits=[0.05, 0.05], inplace=True, nan_policy='propagate')
+        dataset = winsorize(dataset.to_numpy(), limits=[0.05, 0.05], inplace=True, nan_policy='propagate')
         dataset = pd.DataFrame(dataset, columns=columns_list, index=index1)
         #print('\n after winsorize dataset: \n', dataset)
         
