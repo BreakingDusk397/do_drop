@@ -966,7 +966,7 @@ def create_features(dataset):
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["Volatility"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             """
 
-        
+        """
         lr = linear_model.LinearRegression()
 
         for i in dataset.columns.tolist():
@@ -976,6 +976,7 @@ def create_features(dataset):
             y = y.reshape(-1, 1)
             lr.fit(x,y)
             dataset[i+'+1'] = lr.predict(len(y)+1)
+        """
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
