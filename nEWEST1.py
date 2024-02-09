@@ -1306,7 +1306,7 @@ def make_model(dataset, symbol, side):
                         side=side, 
                         take_profit = round(take_profit, 2),
                         stop_loss = round(stop_loss , 2),
-                        qty = round((100 * (math.exp((-5((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
+                        qty = round((100 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
 
@@ -1332,7 +1332,7 @@ def make_model(dataset, symbol, side):
                         side=side, 
                         take_profit = round(take_profit, 2),
                         stop_loss = round(stop_loss , 2),
-                        qty = round((101 * (math.exp((-5((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
+                        qty = round((101 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
                         inventory_risk = get_inventory_risk(symbol = symbol)
                         )
                 
