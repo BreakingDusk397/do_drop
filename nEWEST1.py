@@ -880,7 +880,7 @@ def create_features(dataset):
         dataset['Volatility_ratio'] = dataset['Volatility'] / dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['Volatility_ratio_reversed'] =  dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset['Volatility']
 
-        dataset['trade-able spread'] = dataset['spread2'] - np.sqrt(8 * np.log(100) * dataset['Volatility'])
+        dataset['trade_able_spread'] = dataset['spread2'] - np.sqrt(8 * np.log(100) * dataset['Volatility'])
         
         dataset['last_return'] = np.log(dataset["open"]).pct_change()
         dataset['last_return_5mu'] = dataset['last_return'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
