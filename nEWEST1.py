@@ -971,9 +971,9 @@ def create_features(dataset):
 
         for i in dataset.columns.tolist():
             y = dataset[i][-10:].values
-            x = list(np.arange((len(y))))
+            x = np.arange((len(y)))
             x = x.reshape(-1, 1)
-            y = y.reshape(-1, 1)
+            #y = y.reshape(-1, 1)
             lr.fit(x,y)
             dataset[i+'+1'] = lr.predict(len(y)+1)
 
