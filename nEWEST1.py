@@ -885,7 +885,7 @@ def create_features(dataset):
         dataset['last_return'] = np.log(dataset["open"]).pct_change()
         dataset['last_return_5mu'] = dataset['last_return'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['last_return_5_sum'] = dataset['last_return'].rolling(5).sum(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-        dataset['last_return_10mu'] = dataset['last_re turn'].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['last_return_10mu'] = dataset['last_return'].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['last_return_10_sum'] = dataset['last_return'].rolling(10).sum(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
 
         dataset['std_normalized'] = np.log(dataset[column_price]).rolling(std_period).apply(std_normalized, engine='numba', raw=True, engine_kwargs={"nogil":True, "nopython": True,})
