@@ -883,6 +883,8 @@ def create_features(dataset):
         dataset['trade_able_spread'] = dataset['spread2'] - np.sqrt(8 * np.log(100) * dataset['Volatility'])
         
         dataset['last_return'] = np.log(dataset["open"]).pct_change()
+        dataset['last_return'] = np.log(dataset["last_return"]).pct_change()
+
         dataset['last_return_5mu'] = dataset['last_return'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['last_return_5_sum'] = dataset['last_return'].rolling(5).sum(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['last_return_10mu'] = dataset['last_return'].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
@@ -915,7 +917,7 @@ def create_features(dataset):
         dataset['open+var'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['open_var'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['open+var_diff'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open+var'].shift(1))
-        dataset['open+var_diff'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open-var'].shift(1))
+        dataset['open+var_diff'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open_var'].shift(1))
         
         
         dataset["mu"] = abs((np.log(dataset["open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
