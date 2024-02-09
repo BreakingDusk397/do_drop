@@ -970,10 +970,10 @@ def create_features(dataset):
         lr = linear_model.LinearRegression()
 
         for i in dataset.columns.tolist():
-            y = dataset[i][-10:].values
+            y = dataset[i][-10:].to_numpy()
             x = np.arange((len(y)))
             x = x.reshape(-1, 1)
-            #y = y.reshape(-1, 1)
+            y = y.reshape(-1, 1)
             lr.fit(x,y)
             dataset[i+'+1'] = lr.predict(len(y)+1)
 
