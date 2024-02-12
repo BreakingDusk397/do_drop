@@ -11,9 +11,8 @@ droplet_size='c-2'
 #'c-8-intel'
 droplet_image='centos-stream-9-x64'
 droplet_region='nyc3'
-ssh_key_id='55:b8:a9:5b:84:a8:96:cd:0f:56:1c:b4:67:cc:7d:25'
-ssh_key_pub='ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCZ2mItMJ2j9iV2bAtyN7SVUK5ZntO7kdgMeqcZLWBi/qFVvdonETilKGRJbrk3Jcn48i/30SrX60NifkkfiZhHYS71GWInozan+bURVljyNxpyzkcP12EMqIAYSvMDmQku6puXKYpVp5l86K6a7qtiUVrCgiadjsflgeSBV7NnPERMmUFFOfi6ddW/tcko2Jk1D2yPz35rVWMqewIroZ18tM8PIe9cRwzNPbR0S4efgOFof21GDgCZAhVYTf10485jebFVPwtxfY3TxPW1LRYgO5CYwSJzpK/LBE3OeS+iR3ZjIh2ecmajQaOtM4Ao2LacJyiwWJIkGGzouhGMkAetgId/+ZcCwaYIGaOcJNlQFriNYDjd20rS0t5kySywryD+nlu/e/kUTS+XUb3NCT3Es/Pdmw2qveEmCwMXYYt1SsFmO5GphEkhkBwFr8NpbYFH7stOk3wnKKSwrhDX03qf0WWxdVT6WJDikazQN7S8yM+WnFYN3ml34Ez94Ox1Q1c= tristan@tristan-VirtualBox'
-
+ssh_key_id=''
+ssh_key_pub=''
 
 ##
 # Droplet info session file
