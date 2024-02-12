@@ -1504,7 +1504,7 @@ async def create_model(data):
     
 
     #asyncio.gather(calibrate_params("IWM"))
-    #asyncio.gather(take_profit_method("IWM"))
+    asyncio.gather(take_profit_method("IWM"))
     
 
 
