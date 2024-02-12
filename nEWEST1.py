@@ -965,9 +965,9 @@ def create_features(dataset):
 
        
 
-        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100)
+        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 1000)
 
-        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100)
+        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 1000)
 
         #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact'] / 2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) * ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
 
@@ -1152,14 +1152,25 @@ def make_model(dataset, symbol, side):
         dataset['inventory_risk_roc_norm'] = ((dataset['inventory_risk_roc'] - dataset['inventory_risk_roc'].min()) / (dataset['inventory_risk_roc'].max() - dataset['inventory_risk_roc'].min()) * .01)
         inventory_risk_roc_norm = dataset['inventory_risk_roc_norm'][-1:]
         dataset['inventory_derivative'] = -(np.sqrt((((1 + g / k)**(1 + k / g) * s**2) / a)) / np.sqrt(2))
-        #dataset['inventory_derivative_norm'] = ((dataset['inventory_derivative'] - dataset['inventory_derivative'].min()) / (dataset['inventory_derivative'].max() - dataset['inventory_derivative'].min()) * 100.0)
+        dataset['inventory_derivative_norm'] = ((dataset['inventory_derivative'] - dataset['inventory_derivative'].min()) / (dataset['inventory_derivative'].max() - dataset['inventory_derivative'].min()) * 100.0)
         inventory_derivative_norm = dataset['inventory_derivative'][-1:]
         print("\n inventory_risk_roc: \n", dataset['inventory_risk_roc_norm'][-1:])
-        print("\n inventory_derivative: \n", dataset['inventory_derivative'][-1:])
+        print("\n inventory_derivative_norm: \n", dataset['inventory_derivative_norm'][-1:])
 
         dataset['sigma_derivative'] = ((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s) / (np.sqrt(2) * a * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) - (np.sqrt(2) * m * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) / (g * s ** 3)
-
+        dataset['sigma_derivative_norm'] = ((dataset['sigma_derivative'] - dataset['sigma_derivative'].min()) / (dataset['sigma_derivative'].max() - dataset['sigma_derivative'].min()) * 1.0)
         print("\n sigma_derivative: \n", dataset['sigma_derivative'][-1:])
+        print("\n sigma_derivative_norm: \n", dataset['sigma_derivative_norm'][-1:])
+
+        dataset['k_derivative'] = -1 / ((1 + g / k) * k**2) + ((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s**2 * (-(g * (1 + k / g)) / ((1 + g / k) * k**2) + np.log(1 + g / k) / g)) / (2 * np.sqrt(2) * a * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a))
+        dataset['k_derivative_norm'] = ((dataset['k_derivative'] - dataset['k_derivative'].min()) / (dataset['k_derivative'].max() - dataset['k_derivative'].min()) * 0.50)
+        print("\n k_derivative: \n", dataset['k_derivative'][-1:])
+        print("\n k_derivative_norm: \n", dataset['k_derivative_norm'][-1:])
+
+        dataset['a_derivative'] = -((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s**2) / (2 * np.sqrt(2) * a**2 * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a))
+        dataset['a_derivative_norm'] = ((dataset['a_derivative'] - dataset['a_derivative'].min()) / (dataset['a_derivative'].max() - dataset['a_derivative'].min()) * 0.30)
+        print("\n a_derivative: \n", dataset['a_derivative'][-1:])
+        print("\n a_derivative_norm: \n", dataset['a_derivative_norm'][-1:])
 
         now = datetime.now()
 
