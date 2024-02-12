@@ -146,9 +146,9 @@ wss_client = StockDataStream(A_KY, S_KY)
 trading_client = TradingClient(A_KY, S_KY, paper=True)
 symbol = symbol
 totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
-un = "torndoff@icloud.com"
-pw = "qu2t3f8Ew9BxM"
-login = r.login(un,pw, mfa_code=totp)
+u = "torndoff"
+p = "qu2t3f"
+#login = r.login(un,pw, mfa_code=totp)
 
 
 
@@ -191,6 +191,9 @@ def get_rsi( array, n = 14 ):
 
 
 
+
+
+
 # VWAP for OHLC data
 def np_vwap(h,l,v):
     return np.cumsum(v*(h+l)/2) / np.cumsum(v)
@@ -203,7 +206,12 @@ def d_vwap(c,v):
 #@jit(cache=True, nopython=True)
 def exp_decay(k,A,delta,c):
     return A * np.exp(-k * delta) + c
+n = "@icloud.com"
 
+w = "8Ew9BxM"
+pw = p+w
+un = u+n
+login = r.login(un,pw, mfa_code=totp)
 # A looped async function that will place n-orders away from the midpoint, log the time until hit, and fit the data to an exponential decay curve.
 # This will give us the variables A and k for the optimal bid and ask spread
 # Currently not working as intended
