@@ -130,8 +130,8 @@ ma_period = 15
 price_deviation_period = 15
 volume_deviation_period = 15
 yf_download_previous = 0
-
-
+inventory_risk_roc_norm = 0.001
+inventory_derivative_norm = -0.007
 
 now = datetime.now()
 ask_price_list = pd.DataFrame()
@@ -479,9 +479,12 @@ def get_time_til_close(symbol):
         print("get_time_til_close exception. It's not trading time...")
         #print(traceback.format_exc())
         
-# Calculates the inventory risk (aka gamma or ) for any given symbol
+# Calculates the inventory risk (aka gamma) for any given symbol
+# Smaller gamma means a higher ask and a lower bid. As gamma approaches
+# Typical gamma values are 0.001 to 1
 def get_inventory_risk(symbol):
-    inventory_risk = 0.02
+
+    
     try:
         inventory_qty = 1
         symbol = str(symbol)
@@ -497,26 +500,31 @@ def get_inventory_risk(symbol):
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "IWM":
-            inventory_risk = 0.1 * (abs(inventory_qty)/10) * (current_variance - current_variance.min() / current_variance.max() - current_variance.min())
+            inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance)) + inventory_risk_roc_norm - inventory_derivative_norm
+            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
+            
 
         if symbol == 'SPY':
             inventory_risk = 0.01 * abs(inventory_qty)
+            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
+        
+        return inventory_risk
 
     except:
 
         print("No inventory position.")
         inventory_qty = 1
-        inventory_risk = 0.002
+        inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance)) + inventory_risk_roc_norm - inventory_derivative_norm
         #print(traceback.format_exc())
+        print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
+        return inventory_risk
         
-        
-        
-    finally:
-            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
+    
+            
             
     
 
-    return inventory_risk
+    
 
 # Retrieves current inventory position for a given symbol from Alpaca
 # Old and depreciated.
@@ -869,6 +877,8 @@ def create_features(dataset):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
 
+        
+
         dataset['spread3'] = dataset['open'] - ((dataset['low'] + dataset['high'])/2)
         dataset['spread2'] = dataset['high'] - dataset['low']
         dataset['Volatility'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5))
@@ -916,8 +926,16 @@ def create_features(dataset):
         dataset['variance'] = (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['open+var'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['open_var'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['open+var2'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + 2 * (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['open_var2'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - 2 * (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['open+var3'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) + 3 * (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+        dataset['open_var3'] = np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) - 3 * (np.log(dataset['open']).rolling(5).std(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) * np.sqrt(5)).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         dataset['open+var_diff'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open+var'].shift(1))
         dataset['open+var_diff'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open_var'].shift(1))
+        dataset['open+var_diff2'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open+var2'].shift(1))
+        dataset['open+var_diff2'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open_var2'].shift(1))
+        dataset['open+var_diff3'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open+var3'].shift(1))
+        dataset['open+var_diff3'] = np.cumsum(np.log(dataset['open']).rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}).pct_change() - dataset['open_var3'].shift(1))
         
         
         dataset["mu"] = abs((np.log(dataset["open"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})).pct_change()/2) * 10000)
@@ -928,31 +946,64 @@ def create_features(dataset):
         #dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
         dataset['market_impact'] = dataset['sigma']*np.sqrt(dataset['inventory']/dataset['volume'].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}))
 
-        dataset['bid_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (2 * dataset['inventory'] + 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
+        dataset['bid_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (2 * dataset['inventory'] + 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) )
 
-        dataset['ask_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) - (2 * dataset['inventory'] - 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100000)
+        dataset['ask_spread_aysm'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) - (2 * dataset['inventory'] - 1) / 2 * np.sqrt((dataset['sigma']**2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) )
         
 
         # ((1 / g * log(1 + g / k) + (  mu / (g * s **2) - (2 * i - 1) / 2) * sqrt((s**2 * k) / (2 *k * a) * (1 + g / k)**(1 + k / g))) 
         # ((1 / gamma * log(1 + gamma / k) + (  mu/ (gamma * sigma**2) - (2 * i - 1) / 2) * sqrt((sigma**2 * k) / (2 *k * ask_alpha) * (1 + gamma / k)**(1 + k / gamma))) / 9999999) 
-        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
 
-        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 25000)
+       
 
-        s = dataset['sigma']
-        g = dataset['gamma']
-        k = dataset['k']
-        m = dataset['mu']
-        q = dataset['inventory']
-        a = dataset['bid_alpha']
+        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) )
 
-        #dataset['inventory_risk_roc'] = (s**2 * (g/k + 1)**(k/g + 1)*((k/g + 1)/(k (g/k + 1)) - (k * np.log((g/k + 1)))/g**2)*(m/(g * s**2) + 1/2 (1 - 2 * q)))/(2 * np.sqrt(2) * a * np.sqrt((s**2 (g/k + 1)**(k/g + 1))/a)) - (m * np.sqrt(((s**2 (g/k + 1)**(k/g + 1))/a)))/(np.sqrt(2) * g**2 * s**2) - np.log((g/k + 1))/g**2 + 1/(g * k (g/k + 1))
-        #dataset['inventory derivative'] = -(np.sqrt((((1 + g/k)**(1 + k/g) * s**2)/a))/np.sqrt(2))
-        #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
+        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) )
 
-        #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact']/2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
+        #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact'] / 2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) * ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
+
+        #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact'] / 2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) * ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
+        
+        """
+
+        bid_spread_aysm2_matrix = []
+        ask_spread_aysm2_matrix = []
+        bid_spread_aysm3_matrix = []
+        ask_spread_aysm3_matrix = []
+        # Smaller gamma means a higher ask and a lower bid. As gamma approaches
+        # Typical gamma values are 0.001 to 1
+        for gamma in np.linspace((0.001), (1), num=1000):
+            dataset['bid_spread_aysm2'] = ((1 / gamma * np.log(1 + gamma / dataset['k']) + (- dataset["mu"] / (gamma * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + gamma / dataset['k'])**(1 + dataset['k'] / gamma))) )
+
+            dataset['ask_spread_aysm2'] = ((1 / gamma * np.log(1 + gamma / dataset['k']) + (  dataset["mu"] / (gamma * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + gamma / dataset['k'])**(1 + dataset['k'] / gamma))) )
+            #dataset['bid_spread_aysm3'] = 1 / gamma * np.log( 1 + gamma / dataset['k'] ) + dataset['market_impact'] / 2 + (2 * dataset['inventory'] + 1) / 2 * np.exp((dataset['k'] / 4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * gamma) / (2 * dataset['k'] * dataset['bid_alpha'])) * ( 1 + gamma * dataset['k'] ) ** (1+ dataset['k'] * gamma) )
+
+            #dataset['ask_spread_aysm3'] = 1 / gamma * np.log( 1 + gamma / dataset['k'] ) + dataset['market_impact'] / 2 - (2 * dataset['inventory'] - 1) / 2 * np.exp((dataset['k'] / 4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * gamma) / (2 * dataset['k'] * dataset['ask_alpha'])) * ( 1 + gamma * dataset['k'] ) ** (1+ dataset['k'] * gamma) )
+
+
+            bid_spread_aysm2_matrix.append(dataset['bid_spread_aysm2'][-1:])
+            ask_spread_aysm2_matrix.append(dataset['ask_spread_aysm2'][-1:])
+            #bid_spread_aysm3_matrix.append(dataset['bid_spread_aysm3'][-1:])
+            #ask_spread_aysm3_matrix.append(dataset['ask_spread_aysm3'][-1:])
         
         
+
+        bid_spread_aysm2_matrix = pd.DataFrame(bid_spread_aysm2_matrix)
+        ask_spread_aysm2_matrix = pd.DataFrame(ask_spread_aysm2_matrix)
+        #bid_spread_aysm3_matrix = pd.DataFrame(bid_spread_aysm3_matrix)
+        #ask_spread_aysm3_matrix = pd.DataFrame(ask_spread_aysm3_matrix)
+
+        
+       
+        print("\n bid_spread_aysm2_matrix: \n", bid_spread_aysm2_matrix.describe())
+        print("\n ask_spread_aysm2_matrix: \n", ask_spread_aysm2_matrix.describe())
+        #print("\n bid_spread_aysm3_matrix: \n", bid_spread_aysm3_matrix.describe())
+        #print("\n ask_spread_aysm3_matrix: \n", ask_spread_aysm3_matrix.describe())
+        """
+        
+        
+        
+
         """
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -966,9 +1017,10 @@ def create_features(dataset):
         
         for i in dataset.columns.tolist():
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["Volatility"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
-            """
-
-        """
+            
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
+        
         lr = linear_model.LinearRegression()
 
         for i in dataset.columns.tolist():
@@ -977,13 +1029,14 @@ def create_features(dataset):
             x = x.reshape(-1, 1)
             y = y.reshape(-1, 1)
             lr.fit(x,y)
-            dataset[i+'+1'] = lr.predict(len(y)+1)
-        """
+            dataset[i + '+1'] = lr.predict([[len(y)+1]])
+        
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
-
-        
+        """
+        #dataset.plot()
+        #plt.show
         
         for i in dataset.columns.tolist():
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
@@ -1011,6 +1064,8 @@ def make_model(dataset, symbol, side):
     global best_bid
     global res
     global current_variance
+    global inventory_risk_roc_norm
+    global inventory_derivative_norm
 
     try: 
         t0 = time.time()
@@ -1055,20 +1110,19 @@ def make_model(dataset, symbol, side):
         dataset['bid_alpha'] = bid_alpha
         dataset['bid_sum_delta_vol'] = bid_sum_delta_vol
         dataset['ask_sum_delta_vol'] = ask_sum_delta_vol
-        dataset['k'] = k
+        
         dataset['midpoint'] = midpoint
         
-        dataset = dataset.apply(pd.to_numeric, downcast='float')
-        dataset = dataset.apply(pd.to_numeric, downcast='integer')
+        #dataset = dataset.apply(pd.to_numeric, downcast='float')
+        #dataset = dataset.apply(pd.to_numeric, downcast='integer')
 
-        dataset['bid_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
-        dataset['ask_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
 
         dataset['k'] = np.log((dataset['bid_alpha'] * 1) / (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})))
-
+        
         dataset['bid_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
         dataset['ask_alpha'] = (dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,}) / dataset["volume"].rolling(25).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})) / np.exp(dataset['k'] * 1)
 
+        
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -1077,6 +1131,24 @@ def make_model(dataset, symbol, side):
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
+
+        s = dataset['sigma']
+        g = dataset['gamma']
+        k = dataset['k']
+        m = dataset['mu']
+        q = dataset['inventory']
+        a = dataset['bid_alpha']
+
+        dataset['inventory_risk_roc'] = (s**2 * (g / k + 1) ** (k / g + 1) * ((k / g + 1) / (k * (g / k + 1)) - (k * np.log((g / k + 1))) / g ** 2) * (m / (g * s**2) + 1 / 2 * (1 - 2 * q))) / (2 * np.sqrt(2) * a * np.sqrt((s**2 * (g / k + 1)**(k / g + 1)) / a)) - (m * np.sqrt(((s**2 * (g / k + 1)**(k / g + 1)) / a ))) / (np.sqrt(2) * g**2 * s**2) - np.log((g / k + 1)) / g ** 2 + 1 / (g * k * (g / k + 1))
+        dataset['inventory_risk_roc_norm'] = ((dataset['inventory_risk_roc'] - dataset['inventory_risk_roc'].min()) / (dataset['inventory_risk_roc'].max() - dataset['inventory_risk_roc'].min()) * .01)
+        inventory_risk_roc_norm = dataset['inventory_risk_roc_norm'][-1:]
+        dataset['inventory_derivative'] = -(np.sqrt((((1 + g / k)**(1 + k / g) * s**2) / a)) / np.sqrt(2))
+        #dataset['inventory_derivative_norm'] = ((dataset['inventory_derivative'] - dataset['inventory_derivative'].min()) / (dataset['inventory_derivative'].max() - dataset['inventory_derivative'].min()) * 100.0)
+        inventory_derivative_norm = dataset['inventory_derivative'][-1:]
+        print("\n inventory_risk_roc: \n", dataset['inventory_risk_roc_norm'][-1:])
+        print("\n inventory_derivative: \n", dataset['inventory_derivative'][-1:])
+
+        
 
         now = datetime.now()
 
@@ -1102,13 +1174,23 @@ def make_model(dataset, symbol, side):
 
         inventory = float(inventory_qty)
         inventory_risk = float(get_inventory_risk(symbol))
-        variance = float(current_variance)
+        variance = float(dataset["variance"][-1]) * 1000
         total_steps_in_day = float(420)
         #print(steps_in_day)
         print("\n inventory: \n", inventory)
-
+        """
+        res_matrix = []
+        for gamma in np.linspace((0.0001), (0.1), num=1000):
+            res = np.array(mid_price) - ((np.array(inventory) * np.array(gamma) * (np.array(variance)) * (1 - (np.array(steps_in_day, dtype='float64')/np.array(total_steps_in_day))))/40)
+            res_matrix.append(res)
+        
+        res_matrix = pd.DataFrame(res_matrix)
         
 
+        
+       
+        print("\n res_matrix: \n", res_matrix.describe())
+        """
         res = np.array(mid_price) - ((np.array(inventory) * np.array(inventory_risk) * (np.array(variance)) * (1 - (np.array(steps_in_day, dtype='float64')/np.array(total_steps_in_day))))/40)
         #np.array(current_spread
         print("\n reservation price: \n", res)
@@ -1383,10 +1465,10 @@ async def trade_data_handler(data):
         
         ask_price_list = pd.concat([ask_price_list, row])
         ask_price_list['d_vwap'] = d_vwap(ask_price_list['close'], ask_price_list['volume'])
-        d_vwap1 = ask_price_list['d_vwap'].resample('1S').mean()
-        volume = ask_price_list['volume'].resample('1S').sum()
+        d_vwap1 = ask_price_list['d_vwap'].resample('5S').mean()
+        volume = ask_price_list['volume'].resample('5S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('1S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('5S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
@@ -1442,26 +1524,13 @@ async def create_model(data):
 
 while True:
     now = datetime.now()
-    print(now.hour, now.minute, now.second)
+    #print(now.hour, now.minute, now.second)
 
-    # If the time is between 8:30-9:00am EST start main and background logic loop
-    # I can never get && conditionals to work
-    if int(now.hour) == int(14):
-        if int(now.minute) >= 30:
 
-            print(now)
-            # Call your CODE() function here
-            asyncio.gather(calibrate_params("IWM"))
-            asyncio.gather(take_profit_method("IWM"))
+    if int(now.hour) >= 15:
 
-            wss_client.subscribe_trades(create_model, "IWM")
 
-            wss_client.run()
-    
-    # If the hour is past 9am EST start main and background logic loop
-    if int(now.hour) >= int(15):
-
-        print(now)
+        #print(now)
         # Call your CODE() function here
         asyncio.gather(calibrate_params("IWM"))
         asyncio.gather(take_profit_method("IWM"))
@@ -1471,8 +1540,8 @@ while True:
         wss_client.run()
 
 
-    
-    #time.sleep(10)
+        
+        #time.sleep(10)
 
 
 
