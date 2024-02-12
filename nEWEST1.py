@@ -876,7 +876,7 @@ def z_score_df(df):
     return df
 
 # Semi fast feature generator for features that won't be globally transmitted
-@jit(cache=True)
+#@jit(cache=True)
 def create_features(dataset):
 
         
@@ -1155,6 +1155,8 @@ def make_model(dataset, symbol, side):
         inventory_derivative_norm = dataset['inventory_derivative'][-1:]
         print("\n inventory_risk_roc: \n", dataset['inventory_risk_roc_norm'][-1:])
         print("\n inventory_derivative: \n", dataset['inventory_derivative'][-1:])
+
+        dataset['sigma_derivative'] = ((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s) / (np.sqrt(2) * a * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) - (np.sqrt(2) * m * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) / (g * s ** 3)
 
         
 
