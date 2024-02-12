@@ -787,15 +787,14 @@ def match_orders_for_symbol(symbol):
 
             cancel_orders_for_side(symbol=symbol, side='buy')
             
-            for i in np.linspace(1, qty, num=10):
-                limit_order(symbol=symbol, 
-                            limit_price= round((limit_price - float(i/100)), 2),
-                            side=OrderSide.BUY, 
-                            take_profit = round((limit_price - float(i)), 2),
-                            stop_loss = round((limit_price + float(i)), 2),
-                            qty = abs(i),
-                            inventory_risk = get_inventory_risk(symbol = symbol)
-                            )
+            limit_order(symbol=symbol, 
+                        limit_price= round((limit_price), 2),
+                        side=OrderSide.SELL, 
+                        take_profit = round((take_profit), 2),
+                        stop_loss = round((stop_loss), 2),
+                        qty = abs(qty),
+                        inventory_risk = get_inventory_risk(symbol = symbol)
+                        )
             print("\n Current", qty, side, "positions have been matched. \n")
 
             
@@ -809,7 +808,7 @@ def match_orders_for_symbol(symbol):
             #cancel_orders_for_side(symbol=symbol, side='sell')
             best_spread = best_ask
             stop_loss = round((res - (best_spread * 10)), 2)
-            stop_loss_limit = round((stop_loss + 0.01), 2)
+            stop_loss_limit = round((stop_loss - 0.01), 2)
             take_profit = round((res + (best_spread * 3)), 2)
             if float(best_spread) < -0.01:
                 best_spread = round((best_spread + 0.05), 2)
@@ -818,15 +817,15 @@ def match_orders_for_symbol(symbol):
             current_price = round(res, 2)
             limit_price = round((current_price + spread), 2)
 
-            for i in np.linspace(1, qty, num=10):
-                limit_order(symbol=symbol, 
-                            limit_price= round((limit_price + float(i/100)), 2),
-                            side=OrderSide.SELL, 
-                            take_profit = round((limit_price + float(i)), 2),
-                            stop_loss = round((limit_price - float(i)), 2),
-                            qty = abs(i),
-                            inventory_risk = get_inventory_risk(symbol = symbol)
-                            )
+        
+            limit_order(symbol=symbol, 
+                        limit_price= round((limit_price), 2),
+                        side=OrderSide.SELL, 
+                        take_profit = round((take_profit), 2),
+                        stop_loss = round((stop_loss), 2),
+                        qty = abs(qty),
+                        inventory_risk = get_inventory_risk(symbol = symbol)
+                        )
             
             print("\n Current", qty, side, "positions have been matched. \n")
         
