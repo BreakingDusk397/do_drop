@@ -4,7 +4,6 @@
 ##
 # Variables
 # Add the details of the Droplet that you would like to create
-## dop_v1_024b280680517164d9a668f9085e5e7ab082423884dc8ecf0c038ac9e39a3e90
 
 droplet_name="test-droplet-$RANDOM"
 droplet_size='c-2'
