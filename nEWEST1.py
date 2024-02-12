@@ -1159,7 +1159,7 @@ def make_model(dataset, symbol, side):
 
         dataset['sigma_derivative'] = ((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s) / (np.sqrt(2) * a * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) - (np.sqrt(2) * m * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) / (g * s ** 3)
 
-        
+        print("\n sigma_derivative: \n", dataset['sigma_derivative'][-1:])
 
         now = datetime.now()
 
@@ -1504,7 +1504,7 @@ async def create_model(data):
     
 
     #asyncio.gather(calibrate_params("IWM"))
-    asyncio.gather(take_profit_method("IWM"))
+    #asyncio.gather(take_profit_method("IWM"))
     
 
 
