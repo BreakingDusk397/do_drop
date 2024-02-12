@@ -766,6 +766,7 @@ def match_orders_for_symbol(symbol):
         #print('\n ORDERS: \n',ORDERS)
         side = str(ORDERS[1][7])
         qty = float(ORDERS[1][20])
+        qty = abs(qty)
         
         cancel_orders_for_symbol(symbol)
 
@@ -788,7 +789,7 @@ def match_orders_for_symbol(symbol):
             
             for i in np.linspace(1, qty, num=10):
                 limit_order(symbol=symbol, 
-                            limit_price= round((limit_price - float(i)), 2),
+                            limit_price= round((limit_price - float(i/100)), 2),
                             side=OrderSide.BUY, 
                             take_profit = round((limit_price - float(i)), 2),
                             stop_loss = round((limit_price + float(i)), 2),
@@ -819,7 +820,7 @@ def match_orders_for_symbol(symbol):
 
             for i in np.linspace(1, qty, num=10):
                 limit_order(symbol=symbol, 
-                            limit_price= round((limit_price + float(i)), 2),
+                            limit_price= round((limit_price + float(i/100)), 2),
                             side=OrderSide.SELL, 
                             take_profit = round((limit_price + float(i)), 2),
                             stop_loss = round((limit_price - float(i)), 2),
