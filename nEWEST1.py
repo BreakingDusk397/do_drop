@@ -412,6 +412,8 @@ def get_pricebook(symbol):
             bid_alpha = 0.002
         #print("alpha:", alpha)
         
+        return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
+        
 
     except:
         ask_alpha = 0.5
@@ -422,10 +424,6 @@ def get_pricebook(symbol):
         print(traceback.format_exc())
         return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
 
-    finally:
-
-        get_pricebook_previous = [ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint]
-        return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
     
 
 
@@ -449,6 +447,11 @@ def get_inventory(symbol):
         ORDERS = pd.DataFrame(position)
         inventory_qty = int(ORDERS[1][6])
 
+        elapsed_time = time.process_time() - t
+        print('\n Time to ordebook method: \n', elapsed_time)
+
+        return inventory_qty
+
     except:
         #df_orderbook = yf_download_previous
         #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook.previous
@@ -456,14 +459,12 @@ def get_inventory(symbol):
         print("No inventory position.")
         inventory_qty = 1
         #print(traceback.format_exc())
-
-    finally:
-
-        
         elapsed_time = time.process_time() - t
         print('\n Time to ordebook method: \n', elapsed_time)
 
-    return inventory_qty
+        return inventory_qty
+
+
 
 
 
@@ -549,6 +550,8 @@ def get_open_position(symbol):
 
         side = str(ORDERS[1][7])
         qty = float(ORDERS[1][20])
+        print("\n Current", qty, side, "position. \n")
+        return inventory_qty
 
         
     except:
@@ -556,13 +559,39 @@ def get_open_position(symbol):
         print("No inventory position.")
         inventory_qty = 1
         #print(traceback.format_exc())
+        print("\n Current", qty, side, "position. \n")
+        return inventory_qty
 
-    finally:
-            print("\n Current", qty, side, "position. \n")
-            return inventory_qty
+
         
-    
-    
+
+def take_profit_method2(symbol):
+
+        try:
+            
+            
+            symbol = symbol
+            trading_client = TradingClient(A_KY, S_KY, paper=True)
+            position = trading_client.get_open_position(symbol)
+            ORDERS = pd.DataFrame(position)
+
+            cancel_orders_for_symbol(symbol)
+            
+
+            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
+                cancel_orders_for_symbol(symbol=symbol)
+                
+                trading_client.close_position(symbol)
+
+            
+            
+            if float(ORDERS[1][12]) >=  6:
+                
+                cancel_orders_for_symbol(symbol=symbol)
+                
+                trading_client.close_position(symbol)
+        except:
+            print ("\n take_profit_method error. \n")
 
 
 
@@ -594,7 +623,7 @@ async def take_profit_method(symbol):
                 
                 trading_client.close_position(symbol)
                 
-
+            await asyncio.sleep(3)
             
             # Depreciated stop-loss closing conditions
             """
@@ -641,11 +670,9 @@ async def take_profit_method(symbol):
 
         except:
             print ("\n take_profit_method error. \n")
-            #print(traceback.format_exc())
-
-        finally:
-            print("\n Current positions have been closed. \n")
+            
             await asyncio.sleep(3)
+
 
 
 
@@ -830,8 +857,6 @@ def match_orders_for_symbol(symbol):
             print("\n Current", qty, side, "positions have been matched. \n")
         
 
-    finally:
-        print(f'\n match_orders_for_symbol: {symbol} (a finally block thats always executed)')
 
 
 # Draws up a confusion matrix, accuracy, and F1 scores for validation data
@@ -1148,28 +1173,30 @@ def make_model(dataset, symbol, side):
         a = dataset['bid_alpha']
 
         dataset['inventory_risk_roc'] = (s**2 * (g / k + 1) ** (k / g + 1) * ((k / g + 1) / (k * (g / k + 1)) - (k * np.log((g / k + 1))) / g ** 2) * (m / (g * s**2) + 1 / 2 * (1 - 2 * q))) / (2 * np.sqrt(2) * a * np.sqrt((s**2 * (g / k + 1)**(k / g + 1)) / a)) - (m * np.sqrt(((s**2 * (g / k + 1)**(k / g + 1)) / a ))) / (np.sqrt(2) * g**2 * s**2) - np.log((g / k + 1)) / g ** 2 + 1 / (g * k * (g / k + 1))
-        dataset['inventory_risk_roc_norm'] = ((dataset['inventory_risk_roc'] - dataset['inventory_risk_roc'].min()) / (dataset['inventory_risk_roc'].max() - dataset['inventory_risk_roc'].min()) * .01)
+        dataset['inventory_risk_roc_norm'] = ((2 * ((dataset['inventory_risk_roc'] - dataset['inventory_risk_roc'].min()) / (dataset['inventory_risk_roc'].max() - dataset['inventory_risk_roc'].min()))) - 1) / 10
         inventory_risk_roc_norm = dataset['inventory_risk_roc_norm'][-1:]
         dataset['inventory_derivative'] = -(np.sqrt((((1 + g / k)**(1 + k / g) * s**2) / a)) / np.sqrt(2))
-        dataset['inventory_derivative_norm'] = ((dataset['inventory_derivative'] - dataset['inventory_derivative'].min()) / (dataset['inventory_derivative'].max() - dataset['inventory_derivative'].min()) * 100.0)
+        dataset['inventory_derivative_norm'] = ((2 * ((dataset['inventory_derivative'] - dataset['inventory_derivative'].min()) / (dataset['inventory_derivative'].max() - dataset['inventory_derivative'].min()))) - 1) / 10
         inventory_derivative_norm = dataset['inventory_derivative'][-1:]
         print("\n inventory_risk_roc: \n", dataset['inventory_risk_roc_norm'][-1:])
         print("\n inventory_derivative_norm: \n", dataset['inventory_derivative_norm'][-1:])
 
         dataset['sigma_derivative'] = ((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s) / (np.sqrt(2) * a * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) - (np.sqrt(2) * m * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) / (g * s ** 3)
-        dataset['sigma_derivative_norm'] = ((dataset['sigma_derivative'] - dataset['sigma_derivative'].min()) / (dataset['sigma_derivative'].max() - dataset['sigma_derivative'].min()) * 1.0)
+        dataset['sigma_derivative_norm'] = ((2 * ((dataset['sigma_derivative'] - dataset['sigma_derivative'].min()) / (dataset['sigma_derivative'].max() - dataset['sigma_derivative'].min()))) - 1) / 10
         print("\n sigma_derivative: \n", dataset['sigma_derivative'][-1:])
         print("\n sigma_derivative_norm: \n", dataset['sigma_derivative_norm'][-1:])
 
         dataset['k_derivative'] = -1 / ((1 + g / k) * k**2) + ((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s**2 * (-(g * (1 + k / g)) / ((1 + g / k) * k**2) + np.log(1 + g / k) / g)) / (2 * np.sqrt(2) * a * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a))
-        dataset['k_derivative_norm'] = ((dataset['k_derivative'] - dataset['k_derivative'].min()) / (dataset['k_derivative'].max() - dataset['k_derivative'].min()) * 0.50)
+        dataset['k_derivative_norm'] = ((2 * ((dataset['k_derivative'] - dataset['k_derivative'].min()) / (dataset['k_derivative'].max() - dataset['k_derivative'].min()))) - 1) / 10
         print("\n k_derivative: \n", dataset['k_derivative'][-1:])
         print("\n k_derivative_norm: \n", dataset['k_derivative_norm'][-1:])
 
         dataset['a_derivative'] = -((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s**2) / (2 * np.sqrt(2) * a**2 * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a))
-        dataset['a_derivative_norm'] = ((dataset['a_derivative'] - dataset['a_derivative'].min()) / (dataset['a_derivative'].max() - dataset['a_derivative'].min()) * 0.30)
+        dataset['a_derivative_norm'] = ((2 * ((dataset['a_derivative'] - dataset['a_derivative'].min()) / (dataset['a_derivative'].max() - dataset['a_derivative'].min()))) - 1) / 10
         print("\n a_derivative: \n", dataset['a_derivative'][-1:])
         print("\n a_derivative_norm: \n", dataset['a_derivative_norm'][-1:])
+
+        #dataset['indefinite_integral'] = -(np.sqrt((((g + k)/k)**((g + k)/g) * s**2)/a) * (g * (1 - 2 * q) * s**2 + 4 * m * np.log(s)))/(8 * np.sqrt(2) * a * g * s)
 
         now = datetime.now()
 
@@ -1515,7 +1542,8 @@ async def create_model(data):
 
     #asyncio.gather(calibrate_params("IWM"))
     #asyncio.gather(take_profit_method("IWM"))
-    
+
+    take_profit_method2("IWM")
 
 
     global data_out
