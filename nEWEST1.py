@@ -1513,10 +1513,10 @@ async def trade_data_handler(data):
         
         ask_price_list = pd.concat([ask_price_list, row])
         ask_price_list['d_vwap'] = d_vwap(ask_price_list['close'], ask_price_list['volume'])
-        d_vwap1 = ask_price_list['d_vwap'].resample('1S').mean()
-        volume = ask_price_list['volume'].resample('1S').sum()
+        d_vwap1 = ask_price_list['d_vwap'].resample('2S').mean()
+        volume = ask_price_list['volume'].resample('2S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('1S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample('2S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
