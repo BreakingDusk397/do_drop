@@ -809,8 +809,8 @@ def match_orders_for_symbol(symbol):
                 best_spread = round((best_spread - 0.05), 2)
 
             spread = round(best_spread, 2)
-            current_price = round(res, 2)
-            limit_price = round((current_price + spread), 2)
+            current_price = round(abs(res), 2)
+            limit_price = abs(round((current_price + spread), 2))
 
             cancel_orders_for_side(symbol=symbol, side='buy')
             
@@ -841,8 +841,8 @@ def match_orders_for_symbol(symbol):
                 best_spread = round((best_spread + 0.05), 2)
 
             spread = round(best_spread, 2)
-            current_price = round(res, 2)
-            limit_price = round((current_price + spread), 2)
+            current_price = round(abs(res), 2)
+            limit_price = abs(round((current_price + spread), 2))
 
         
             limit_order(symbol=symbol, 
@@ -1429,16 +1429,16 @@ def make_model(dataset, symbol, side):
                 current_price = res
                 limit_price = round(current_price + spread, 2)
 
-                
+                for i in range(5):
 
-                limit_order(symbol=symbol, 
-                        limit_price=round(limit_price, 2),
-                        side=side, 
-                        take_profit = round(take_profit, 2),
-                        stop_loss = round(stop_loss , 2),
-                        qty = round((100 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
-                        inventory_risk = get_inventory_risk(symbol = symbol)
-                        )
+                    limit_order(symbol=symbol, 
+                            limit_price=round(limit_price - (float(i)/100), 2),
+                            side=side, 
+                            take_profit = round(take_profit + (float(i)/100), 2),
+                            stop_loss = round(stop_loss - (float(i)/100), 2),
+                            qty = round((101 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
+                            inventory_risk = get_inventory_risk(symbol = symbol)
+                            )
 
 
             if str(side) == 'OrderSide.SELL':
@@ -1456,16 +1456,17 @@ def make_model(dataset, symbol, side):
                 spread = best_spread
                 current_price = res
                 limit_price = round(current_price + spread, 2)
-
-                limit_order(symbol=symbol, 
-                        limit_price=round(limit_price, 2),
-                        side=side, 
-                        take_profit = round(take_profit, 2),
-                        stop_loss = round(stop_loss , 2),
-                        qty = round((101 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
-                        inventory_risk = get_inventory_risk(symbol = symbol)
-                        )
-                
+                for i in range(5):
+                        
+                    limit_order(symbol=symbol, 
+                            limit_price=round(limit_price + (float(i)/100), 2),
+                            side=side, 
+                            take_profit = round(take_profit - (float(i)/100), 2),
+                            stop_loss = round(stop_loss + (float(i)/100), 2),
+                            qty = round((101 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
+                            inventory_risk = get_inventory_risk(symbol = symbol)
+                            )
+                    
 
         t1 = time.time()
         total = t1-t0
