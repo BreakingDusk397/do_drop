@@ -13,7 +13,7 @@
 # then utilizes ssh commands to connect to my Github repo. and dowloand the current version of this program.
 # It downloads the require packages and initializes this python script. The script runs in a loop until 9am EST, 
 # It starts the background async methods (calibrate_params and take_profit_method.)
-# After that it connects to the Alpaca data stream for the given symbols, currently only "IWM", and runs the trading loop until close.
+# After that it connects to the Alpaca data stream for the given symbols, currently only "XRT", and runs the trading loop until close.
 #
 #
 #
@@ -105,7 +105,7 @@ column_low = 'low'
 column_volume = 'volume'
 current_variance = 0.3
 midpoint_SPY = 0
-midpoint_IWM = 0
+midpoint_XRT = 0
 midpoint_AMD = 0
 midpoint = 0
 ask_alpha = 0.01
@@ -138,7 +138,7 @@ ask_price_list = pd.DataFrame()
 ask_price_list5 = pd.DataFrame()
 ask_price_list_AMD5 = pd.DataFrame()
 current_vwap = 200
-symbol = "IWM"
+symbol = "XRT"
 BASE_URL = "https://paper-api.alpaca.markets"
 A_KY = "PKCSSHRBEDBBETRCTIC0"
 S_KY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
@@ -508,7 +508,7 @@ def get_inventory_risk(symbol):
 
         inventory_qty = int(ORDERS[1][6])
 
-        if symbol == "IWM":
+        if symbol == "XRT":
             inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance)) + inventory_risk_roc_norm - inventory_derivative_norm
             print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
             
@@ -776,85 +776,89 @@ def match_orders_for_symbol(symbol):
 
     qty = 1
 
-    
+    res = abs(res)
 
     try:
         symbol = symbol
         trading_client = TradingClient(A_KY, S_KY, paper=True)
         ORDERS = trading_client.get_open_position(symbol)
+        
 
     except:    
         print("\n match_orders_for_symbol() exception, probably no inventory present. \n")  
         print(traceback.format_exc())   
-        pass
-
-    else:
-        ORDERS = pd.DataFrame(ORDERS)
-        #print('\n ORDERS: \n',ORDERS)
-        side = str(ORDERS[1][7])
-        qty = float(ORDERS[1][20])
-        qty = abs(qty)
-        
-        cancel_orders_for_symbol(symbol)
-
-        if str(side) == 'PositionSide.SHORT':
-
-            spread = -0.02
-            #cancel_orders_for_side(symbol=symbol, side='sell')
-            best_spread = best_bid
-            stop_loss = round((res + (best_spread * 10)), 2)
-            stop_loss_limit = round((stop_loss - 0.01), 2)
-            take_profit = round((res - (best_spread * 3)), 2)
-            if float(best_spread) > -0.01:
-                best_spread = round((best_spread - 0.05), 2)
-
-            spread = round(best_spread, 2)
-            current_price = round(abs(res), 2)
-            limit_price = abs(round((current_price + spread), 2))
-
-            cancel_orders_for_side(symbol=symbol, side='buy')
-            
-            limit_order(symbol=symbol, 
-                        limit_price= round((limit_price), 2),
-                        side=OrderSide.SELL, 
-                        take_profit = round((take_profit), 2),
-                        stop_loss = round((stop_loss), 2),
-                        qty = abs(qty),
-                        inventory_risk = get_inventory_risk(symbol = symbol)
-                        )
-            print("\n Current", qty, side, "positions have been matched. \n")
-
-            
         
 
-        if str(side) == 'PositionSide.LONG':
+
+    ORDERS = pd.DataFrame(ORDERS)
+    #print('\n ORDERS: \n',ORDERS)
+    side = str(ORDERS[1][7])
+    qty = float(ORDERS[1][20])
+    qty = abs(qty)
+    
+    
+    cancel_orders_for_symbol(symbol)
+
+    if str(side) == 'PositionSide.SHORT':
+
+        spread = -0.02
+        #cancel_orders_for_side(symbol=symbol, side='sell')
+        best_spread = best_bid
+        
+        if float(best_spread) > -0.01:
+            best_spread = round((best_spread - 0.05), 2)
             
-            cancel_orders_for_side(symbol=symbol, side='sell')
+        stop_loss = abs(round((res + (best_spread * 10)), 2))
+        stop_loss_limit = abs(round((stop_loss - 0.01), 2))
+        take_profit = abs(round((res - (best_spread * 3)), 2))
+        spread = round(best_spread, 2)
+        current_price = round(abs(res), 2)
+        limit_price = abs(round((current_price + spread), 2))
 
-            spread = -0.02
-            #cancel_orders_for_side(symbol=symbol, side='sell')
-            best_spread = best_ask
-            stop_loss = round((res - (best_spread * 10)), 2)
-            stop_loss_limit = round((stop_loss - 0.01), 2)
-            take_profit = round((res + (best_spread * 3)), 2)
-            if float(best_spread) < -0.01:
-                best_spread = round((best_spread + 0.05), 2)
-
-            spread = round(best_spread, 2)
-            current_price = round(abs(res), 2)
-            limit_price = abs(round((current_price + spread), 2))
+        cancel_orders_for_side(symbol=symbol, side='buy')
+        
+        limit_order(symbol=symbol, 
+                    limit_price= round((limit_price), 2),
+                    side=OrderSide.SELL, 
+                    take_profit = round((take_profit), 2),
+                    stop_loss = round((stop_loss), 2),
+                    qty = abs(qty),
+                    inventory_risk = get_inventory_risk(symbol = symbol)
+                    )
+        print("\n Current", qty, side, "positions have been matched. \n")
 
         
-            limit_order(symbol=symbol, 
-                        limit_price= round((limit_price), 2),
-                        side=OrderSide.SELL, 
-                        take_profit = round((take_profit), 2),
-                        stop_loss = round((stop_loss), 2),
-                        qty = abs(qty),
-                        inventory_risk = get_inventory_risk(symbol = symbol)
-                        )
+    
+
+    if str(side) == 'PositionSide.LONG':
+        
+        cancel_orders_for_side(symbol=symbol, side='sell')
+
+        spread = -0.02
+        #cancel_orders_for_side(symbol=symbol, side='sell')
+        best_spread = best_ask
+        
+        if float(best_spread) < -0.01:
+            best_spread = round((best_spread + 0.05), 2)
             
-            print("\n Current", qty, side, "positions have been matched. \n")
+        stop_loss = abs(round((res - (best_spread * 10)), 2))
+        stop_loss_limit = abs(round((stop_loss - 0.01), 2))
+        take_profit = abs(round((res + (best_spread * 3)), 2))
+        spread = round(best_spread, 2)
+        current_price = round(abs(res), 2)
+        limit_price = abs(round((current_price + spread), 2))
+
+    
+        limit_order(symbol=symbol, 
+                    limit_price= round((limit_price), 2),
+                    side=OrderSide.SELL, 
+                    take_profit = round((take_profit), 2),
+                    stop_loss = round((stop_loss), 2),
+                    qty = abs(qty),
+                    inventory_risk = get_inventory_risk(symbol = symbol)
+                    )
+        
+        print("\n Current", qty, side, "positions have been matched. \n")
         
 
 
@@ -1315,7 +1319,7 @@ def make_model(dataset, symbol, side):
 
         if str(side) == 'OrderSide.BUY':
             side = OrderSide.BUY
-            if symbol == 'IWM':
+            if symbol == 'XRT':
                 y = y
             #if symbol == 'SPY':
                 #y = y_SPY
@@ -1323,7 +1327,7 @@ def make_model(dataset, symbol, side):
 
         if str(side) == 'OrderSide.SELL':
             side = OrderSide.SELL
-            if symbol == 'IWM':
+            if symbol == 'XRT':
                 y = y_sell
                 dataset = dataset_sell
             #if symbol == 'SPY':
@@ -1499,7 +1503,7 @@ async def trade_data_handler(data):
     symbol = df[1][0]
 
 
-    if symbol == "IWM":
+    if symbol == "XRT":
         timestamp = df[1][1]
         ask_price = df[1][3]
         volume = df[1][4]
@@ -1525,7 +1529,7 @@ async def trade_data_handler(data):
         ask_price_list3 = ask_price_list3.ffill()
         current_vwap = float(ask_price_list3['d_vwap'][-1:])
 
-        #print('\n ask_price_list_IWM: \n', ask_price_list3)
+        #print('\n ask_price_list_XRT: \n', ask_price_list3)
         elapsed_time = time.process_time() - t
         print('\n Time to fetch data: \n', elapsed_time)
         return ask_price_list3
@@ -1541,10 +1545,10 @@ async def create_model(data):
     
     
 
-    #asyncio.gather(calibrate_params("IWM"))
-    #asyncio.gather(take_profit_method("IWM"))
+    #asyncio.gather(calibrate_params("XRT"))
+    #asyncio.gather(take_profit_method("XRT"))
 
-    take_profit_method2("IWM")
+    take_profit_method2("XRT")
 
 
     global data_out
@@ -1558,7 +1562,7 @@ async def create_model(data):
     data_out.drop(data_out.filter(regex='_y$').columns, axis=1, inplace=True)
     
     dataset = data_out
-    symbol_list = ['IWM', 'IWM', ]
+    symbol_list = ['XRT', 'XRT', ]
     side_list = ['OrderSide.BUY', 'OrderSide.SELL' ]
     x_list = [dataset, dataset]
 
@@ -1569,7 +1573,7 @@ async def create_model(data):
 
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
-    match_orders_for_symbol(symbol='IWM')
+    match_orders_for_symbol(symbol='XRT')
 
 
 while True:
@@ -1582,10 +1586,10 @@ while True:
 
         #print(now)
         # Call your CODE() function here
-        asyncio.gather(calibrate_params("IWM"))
-        asyncio.gather(take_profit_method("IWM"))
+        asyncio.gather(calibrate_params("XRT"))
+        asyncio.gather(take_profit_method("XRT"))
 
-        wss_client.subscribe_trades(create_model, "IWM")
+        wss_client.subscribe_trades(create_model, "XRT")
 
         wss_client.run()
 
