@@ -13,7 +13,7 @@
 # then utilizes ssh commands to connect to my Github repo. and dowloand the current version of this program.
 # It downloads the require packages and initializes this python script. The script runs in a loop until 9am EST, 
 # It starts the background async methods (calibrate_params and take_profit_method.)
-# After that it connects to the Alpaca data stream for the given symbols, currently only "XRT", and runs the trading loop until close.
+# After that it connects to the Alpaca data stream for the given symbols, currently only "IWM", and runs the trading loop until close.
 #
 #
 #
@@ -98,6 +98,8 @@ pd.set_option('display.width', 100)
 print(datetime.now())
 
 # Required initial values
+
+respampling_period = 20
 res = 0
 column_price = 'open'
 column_high = 'high'
@@ -105,7 +107,7 @@ column_low = 'low'
 column_volume = 'volume'
 current_variance = 0.3
 midpoint_SPY = 0
-midpoint_XRT = 0
+midpoint_IWM = 0
 midpoint_AMD = 0
 midpoint = 0
 ask_alpha = 0.01
@@ -138,7 +140,7 @@ ask_price_list = pd.DataFrame()
 ask_price_list5 = pd.DataFrame()
 ask_price_list_AMD5 = pd.DataFrame()
 current_vwap = 200
-symbol = "XRT"
+symbol = "IWM"
 BASE_URL = "https://paper-api.alpaca.markets"
 A_KY = "PKCSSHRBEDBBETRCTIC0"
 S_KY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
@@ -151,6 +153,17 @@ p = "qu2t3f"
 #login = r.login(un,pw, mfa_code=totp)
 
 
+# Generates geometric brownian paths with monte carlo simulation 
+# that'll be helpful later on to fit calibrated probability density functions to the sim.
+def gen_paths(S0, r, sigma, T, M, I):
+    dt = float(T) / M
+    paths = np.zeros((M + 1, I), np.float64)
+    paths[0] = S0
+    for t in range(1, M + 1):
+        rand = np.random.standard_normal(I)
+        paths[t] = paths[t - 1] * np.exp((r - 0.5 * sigma ** 2) * dt +
+                                         sigma * np.sqrt(dt) * rand)
+    return paths
 
 
 # Fast RSI Calculator
@@ -508,7 +521,7 @@ def get_inventory_risk(symbol):
 
         inventory_qty = int(ORDERS[1][6])
 
-        if symbol == "XRT":
+        if symbol == "IWM":
             inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance)) + inventory_risk_roc_norm - inventory_derivative_norm
             print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
             
@@ -590,6 +603,12 @@ def take_profit_method2(symbol):
                 cancel_orders_for_symbol(symbol=symbol)
                 
                 trading_client.close_position(symbol)
+
+            if float(ORDERS[1][12]) <=  -5:
+
+                cancel_orders_for_symbol(symbol=symbol)
+                
+                trading_client.close_position(symbol)
         except:
             print ("\n take_profit_method error. \n")
 
@@ -619,6 +638,12 @@ async def take_profit_method(symbol):
             
             if float(ORDERS[1][12]) >=  6:
                 
+                cancel_orders_for_symbol(symbol=symbol)
+                
+                trading_client.close_position(symbol)
+
+            if float(ORDERS[1][12]) <=  -5:
+
                 cancel_orders_for_symbol(symbol=symbol)
                 
                 trading_client.close_position(symbol)
@@ -808,7 +833,7 @@ def match_orders_for_symbol(symbol):
         if float(best_spread) > -0.01:
             best_spread = round((best_spread - 0.05), 2)
             
-        stop_loss = abs(round((res + (best_spread * 10)), 2))
+        stop_loss = abs(round((res + (best_spread * 100)), 2))
         stop_loss_limit = abs(round((stop_loss - 0.01), 2))
         take_profit = abs(round((res - (best_spread * 3)), 2))
         spread = round(best_spread, 2)
@@ -841,7 +866,7 @@ def match_orders_for_symbol(symbol):
         if float(best_spread) < -0.01:
             best_spread = round((best_spread + 0.05), 2)
             
-        stop_loss = abs(round((res - (best_spread * 10)), 2))
+        stop_loss = abs(round((res - (best_spread * 100)), 2))
         stop_loss_limit = abs(round((stop_loss - 0.01), 2))
         take_profit = abs(round((res + (best_spread * 3)), 2))
         spread = round(best_spread, 2)
@@ -1001,6 +1026,8 @@ def create_features(dataset):
 
         #dataset['ask_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact'] / 2 - (2 * dataset['inventory'] - 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['ask_alpha'])) * ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
         
+
+
         """
 
         bid_spread_aysm2_matrix = []
@@ -1058,22 +1085,33 @@ def create_features(dataset):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
         
-        lr = linear_model.LinearRegression()
+        """
+        #dataset.plot()
+        #plt.show
 
-        for i in dataset.columns.tolist():
-            y = dataset[i][-10:].to_numpy()
-            x = np.arange((len(y)))
-            x = x.reshape(-1, 1)
-            y = y.reshape(-1, 1)
-            lr.fit(x,y)
-            dataset[i + '+1'] = lr.predict([[len(y)+1]])
+        dataset_columns = dataset.columns.tolist()
         
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
-        """
-        #dataset.plot()
-        #plt.show
+        
+        # Predict one step ahead with linear regression using the last 30 values
+        lr = linear_model.LinearRegression()
+        lookback = 15
+        forward_pred_step = 2
+        for i in dataset_columns:
+            y = (dataset[i][-lookback:]).values
+            x = (np.arange(0,lookback))
+            x = x.reshape(-1, 1)
+            y = y.reshape(-1, 1)
+            lr.fit(x,y)
+            pred = lr.predict([[(lookback + forward_pred_step)]])
+            pred = pred[:,0]
+            dataset[i + '+' + str(forward_pred_step)] = pd.Series(pred)
+
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
+        
         
         for i in dataset.columns.tolist():
             #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
@@ -1177,30 +1215,69 @@ def make_model(dataset, symbol, side):
         a = dataset['bid_alpha']
 
         dataset['inventory_risk_roc'] = (s**2 * (g / k + 1) ** (k / g + 1) * ((k / g + 1) / (k * (g / k + 1)) - (k * np.log((g / k + 1))) / g ** 2) * (m / (g * s**2) + 1 / 2 * (1 - 2 * q))) / (2 * np.sqrt(2) * a * np.sqrt((s**2 * (g / k + 1)**(k / g + 1)) / a)) - (m * np.sqrt(((s**2 * (g / k + 1)**(k / g + 1)) / a ))) / (np.sqrt(2) * g**2 * s**2) - np.log((g / k + 1)) / g ** 2 + 1 / (g * k * (g / k + 1))
-        dataset['inventory_risk_roc_norm'] = ((2 * ((dataset['inventory_risk_roc'] - dataset['inventory_risk_roc'].min()) / (dataset['inventory_risk_roc'].max() - dataset['inventory_risk_roc'].min()))) - 1) / 10
+        dataset['inventory_risk_roc_norm'] = ((2 * ((dataset['inventory_risk_roc'] - dataset['inventory_risk_roc'].min()) / (dataset['inventory_risk_roc'].max() - dataset['inventory_risk_roc'].min()))) - 1)
         inventory_risk_roc_norm = dataset['inventory_risk_roc_norm'][-1:]
         dataset['inventory_derivative'] = -(np.sqrt((((1 + g / k)**(1 + k / g) * s**2) / a)) / np.sqrt(2))
-        dataset['inventory_derivative_norm'] = ((2 * ((dataset['inventory_derivative'] - dataset['inventory_derivative'].min()) / (dataset['inventory_derivative'].max() - dataset['inventory_derivative'].min()))) - 1) / 10
+        dataset['inventory_derivative_norm'] = ((2 * ((dataset['inventory_derivative'] - dataset['inventory_derivative'].min()) / (dataset['inventory_derivative'].max() - dataset['inventory_derivative'].min()))) - 1)
         inventory_derivative_norm = dataset['inventory_derivative'][-1:]
         print("\n inventory_risk_roc: \n", dataset['inventory_risk_roc_norm'][-1:])
         print("\n inventory_derivative_norm: \n", dataset['inventory_derivative_norm'][-1:])
 
         dataset['sigma_derivative'] = ((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s) / (np.sqrt(2) * a * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) - (np.sqrt(2) * m * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a)) / (g * s ** 3)
-        dataset['sigma_derivative_norm'] = ((2 * ((dataset['sigma_derivative'] - dataset['sigma_derivative'].min()) / (dataset['sigma_derivative'].max() - dataset['sigma_derivative'].min()))) - 1) / 10
+        dataset['sigma_derivative_norm'] = ((2 * ((dataset['sigma_derivative'] - dataset['sigma_derivative'].min()) / (dataset['sigma_derivative'].max() - dataset['sigma_derivative'].min()))) - 1)
         print("\n sigma_derivative: \n", dataset['sigma_derivative'][-1:])
         print("\n sigma_derivative_norm: \n", dataset['sigma_derivative_norm'][-1:])
 
         dataset['k_derivative'] = -1 / ((1 + g / k) * k**2) + ((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s**2 * (-(g * (1 + k / g)) / ((1 + g / k) * k**2) + np.log(1 + g / k) / g)) / (2 * np.sqrt(2) * a * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a))
-        dataset['k_derivative_norm'] = ((2 * ((dataset['k_derivative'] - dataset['k_derivative'].min()) / (dataset['k_derivative'].max() - dataset['k_derivative'].min()))) - 1) / 10
+        dataset['k_derivative_norm'] = ((2 * ((dataset['k_derivative'] - dataset['k_derivative'].min()) / (dataset['k_derivative'].max() - dataset['k_derivative'].min()))) - 1)
         print("\n k_derivative: \n", dataset['k_derivative'][-1:])
         print("\n k_derivative_norm: \n", dataset['k_derivative_norm'][-1:])
 
         dataset['a_derivative'] = -((1 + g / k)**(1 + k / g) * (1 / 2 * (1 - 2 * q) + m / (g * s**2)) * s**2) / (2 * np.sqrt(2) * a**2 * np.sqrt(((1 + g / k)**(1 + k / g) * s**2) / a))
-        dataset['a_derivative_norm'] = ((2 * ((dataset['a_derivative'] - dataset['a_derivative'].min()) / (dataset['a_derivative'].max() - dataset['a_derivative'].min()))) - 1) / 10
+        dataset['a_derivative_norm'] = ((2 * ((dataset['a_derivative'] - dataset['a_derivative'].min()) / (dataset['a_derivative'].max() - dataset['a_derivative'].min()))) - 1)
         print("\n a_derivative: \n", dataset['a_derivative'][-1:])
         print("\n a_derivative_norm: \n", dataset['a_derivative_norm'][-1:])
 
-        #dataset['indefinite_integral'] = -(np.sqrt((((g + k)/k)**((g + k)/g) * s**2)/a) * (g * (1 - 2 * q) * s**2 + 4 * m * np.log(s)))/(8 * np.sqrt(2) * a * g * s)
+        dataset['indefinite_integral'] = -(np.sqrt((((g + k)/k)**((g + k)/g) * s**2)/a) * (g * (1 - 2 * q) * s**2 + 4 * m * np.log(s)))/(8 * np.sqrt(2) * a * g * s)
+        dataset['indefinite_integral'] = (8 * s**2 * np.log((g + k)/k) + np.sqrt(2) * np.sqrt((((g + k)/k)**((g + k)/g) * s**2)/a) * (g * (1 - 2 * q) * s**2 + 4 * m * np.log(s)))/(8 * g * s)
+
+
+
+
+        # initial asset value
+        S0 = dataset['open'][-1:].values.reshape(-1, 1)
+        # option strike 
+        K = 100.0
+        # continuously compounded risk free rate for 1 second; annualized / seconds * tradings mins * trading days
+        R = 0.07 / (60.0 * 420 * 252)
+
+        sigma = dataset['variance'][-1:].values.reshape(-1, 1)
+
+        # Time step start
+        T = 1
+        # Time step end
+        N = respampling_period
+        deltat = T / N
+        # Number of paths
+        i = 10000
+
+        discount_factor = np.exp(-R * T)
+        paths = gen_paths(S0, R, sigma, T, N, i)
+        dataset['avg_path'] = np.average(paths[-1])
+        dataset['median_path'] = np.median(paths[-1])
+        dataset['std_path'] = np.std(paths[-1])
+
+        print('\n open: \n', dataset['open'][-1])
+        print('\n avg_path: \n', dataset['avg_path'][-1])
+        print('\n median_path: \n', dataset['median_path'][-1])
+        print('\n std_path: \n', dataset['std_path'][-1])
+
+
+
+
+
+
+
 
         now = datetime.now()
 
@@ -1319,7 +1396,7 @@ def make_model(dataset, symbol, side):
 
         if str(side) == 'OrderSide.BUY':
             side = OrderSide.BUY
-            if symbol == 'XRT':
+            if symbol == 'IWM':
                 y = y
             #if symbol == 'SPY':
                 #y = y_SPY
@@ -1327,7 +1404,7 @@ def make_model(dataset, symbol, side):
 
         if str(side) == 'OrderSide.SELL':
             side = OrderSide.SELL
-            if symbol == 'XRT':
+            if symbol == 'IWM':
                 y = y_sell
                 dataset = dataset_sell
             #if symbol == 'SPY':
@@ -1423,24 +1500,50 @@ def make_model(dataset, symbol, side):
                 spread = -0.02
                 cancel_orders_for_side(symbol=symbol, side='sell')
                 best_spread = best_bid
-                stop_loss = res - (best_spread * 10)
-                stop_loss_limit = stop_loss - 0.01
+                
                 take_profit = res + (best_spread * 3)
                 if float(best_spread) > -0.01:
                     best_spread = best_spread + -0.05
-
+                stop_loss = res - (best_spread * 1)
+                stop_loss_limit = stop_loss - 0.01
                 spread = best_spread
                 current_price = res
                 limit_price = round(current_price + spread, 2)
 
-                for i in range(5):
+                for i in range(1,5):
 
                     limit_order(symbol=symbol, 
                             limit_price=round(limit_price - (float(i)/100), 2),
                             side=side, 
                             take_profit = round(take_profit + (float(i)/100), 2),
                             stop_loss = round(stop_loss - (float(i)/100), 2),
-                            qty = round((101 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
+                            qty = round((1001 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))) + float(i),
+                            inventory_risk = get_inventory_risk(symbol = symbol)
+                            )
+                    
+                
+
+                spread = 0.02
+                cancel_orders_for_side(symbol=symbol, side='buy')
+                best_spread = best_ask
+
+                take_profit = res - (best_spread * 3)
+                
+                if float(best_spread) < 0.01:
+                    best_spread = best_spread + 0.05
+                stop_loss = res + (best_spread * 1)
+                stop_loss_limit = stop_loss + 0.01
+                spread = best_spread
+                current_price = res
+                limit_price = round(current_price + spread, 2)
+                for i in range(1,5):
+                        
+                    limit_order(symbol=symbol, 
+                            limit_price=round(limit_price + (float(i)/100), 2),
+                            side=OrderSide.SELL, 
+                            take_profit = round(take_profit - (float(i)/100), 2),
+                            stop_loss = round(stop_loss + (float(i)/100), 2),
+                            qty = round((1001 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))) + float(i),
                             inventory_risk = get_inventory_risk(symbol = symbol)
                             )
 
@@ -1450,24 +1553,50 @@ def make_model(dataset, symbol, side):
                 spread = 0.02
                 cancel_orders_for_side(symbol=symbol, side='buy')
                 best_spread = best_ask
-                stop_loss = res + (best_spread * 10)
-                stop_loss_limit = stop_loss + 0.01
+                
                 take_profit = res - (best_spread * 3)
                 
                 if float(best_spread) < 0.01:
                     best_spread = best_spread + 0.05
-
+                stop_loss = res + (best_spread * 1)
+                stop_loss_limit = stop_loss + 0.01
                 spread = best_spread
                 current_price = res
                 limit_price = round(current_price + spread, 2)
-                for i in range(5):
+                for i in range(1,5):
                         
                     limit_order(symbol=symbol, 
                             limit_price=round(limit_price + (float(i)/100), 2),
                             side=side, 
                             take_profit = round(take_profit - (float(i)/100), 2),
                             stop_loss = round(stop_loss + (float(i)/100), 2),
-                            qty = round((101 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))),
+                            qty = round((1001 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))) + float(i),
+                            inventory_risk = get_inventory_risk(symbol = symbol)
+                            )
+                    
+                
+                spread = -0.02
+                cancel_orders_for_side(symbol=symbol, side='sell')
+                best_spread = best_bid
+                stop_loss = res - (best_spread * 10)
+                stop_loss_limit = stop_loss - 0.01
+                take_profit = res + (best_spread * 3)
+                if float(best_spread) > -0.01:
+                    best_spread = best_spread + -0.05
+                stop_loss = res - (best_spread * 1)
+                stop_loss_limit = stop_loss - 0.01
+                spread = best_spread
+                current_price = res
+                limit_price = round(current_price + spread, 2)
+
+                for i in range(1,5):
+
+                    limit_order(symbol=symbol, 
+                            limit_price=round(limit_price - (float(i)/100), 2),
+                            side=OrderSide.BUY, 
+                            take_profit = round(take_profit + (float(i)/100), 2),
+                            stop_loss = round(stop_loss - (float(i)/100), 2),
+                            qty = round((1001 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))) + float(i),
                             inventory_risk = get_inventory_risk(symbol = symbol)
                             )
                     
@@ -1503,7 +1632,7 @@ async def trade_data_handler(data):
     symbol = df[1][0]
 
 
-    if symbol == "XRT":
+    if symbol == "IWM":
         timestamp = df[1][1]
         ask_price = df[1][3]
         volume = df[1][4]
@@ -1518,10 +1647,10 @@ async def trade_data_handler(data):
         
         ask_price_list = pd.concat([ask_price_list, row])
         ask_price_list['d_vwap'] = d_vwap(ask_price_list['close'], ask_price_list['volume'])
-        d_vwap1 = ask_price_list['d_vwap'].resample('1S').mean()
-        volume = ask_price_list['volume'].resample('1S').sum()
+        d_vwap1 = ask_price_list['d_vwap'].resample(str(respampling_period) + 'S').mean()
+        volume = ask_price_list['volume'].resample(str(respampling_period) + 'S').sum()
 
-        ask_price_list3 = ask_price_list['close'].resample('1S').ohlc()
+        ask_price_list3 = ask_price_list['close'].resample(str(respampling_period) + 'S').ohlc()
         ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
         ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
@@ -1529,7 +1658,7 @@ async def trade_data_handler(data):
         ask_price_list3 = ask_price_list3.ffill()
         current_vwap = float(ask_price_list3['d_vwap'][-1:])
 
-        #print('\n ask_price_list_XRT: \n', ask_price_list3)
+        #print('\n ask_price_list_IWM: \n', ask_price_list3)
         elapsed_time = time.process_time() - t
         print('\n Time to fetch data: \n', elapsed_time)
         return ask_price_list3
@@ -1545,10 +1674,10 @@ async def create_model(data):
     
     
 
-    #asyncio.gather(calibrate_params("XRT"))
-    #asyncio.gather(take_profit_method("XRT"))
+    #asyncio.gather(calibrate_params("IWM"))
+    #asyncio.gather(take_profit_method("IWM"))
 
-    take_profit_method2("XRT")
+    take_profit_method2("IWM")
 
 
     global data_out
@@ -1562,7 +1691,7 @@ async def create_model(data):
     data_out.drop(data_out.filter(regex='_y$').columns, axis=1, inplace=True)
     
     dataset = data_out
-    symbol_list = ['XRT', 'XRT', ]
+    symbol_list = ['IWM', 'IWM', ]
     side_list = ['OrderSide.BUY', 'OrderSide.SELL' ]
     x_list = [dataset, dataset]
 
@@ -1573,7 +1702,7 @@ async def create_model(data):
 
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
-    match_orders_for_symbol(symbol='XRT')
+    match_orders_for_symbol(symbol='IWM')
 
 
 while True:
@@ -1586,10 +1715,10 @@ while True:
 
         #print(now)
         # Call your CODE() function here
-        asyncio.gather(calibrate_params("XRT"))
-        asyncio.gather(take_profit_method("XRT"))
+        asyncio.gather(calibrate_params("IWM"))
+        asyncio.gather(take_profit_method("IWM"))
 
-        wss_client.subscribe_trades(create_model, "XRT")
+        wss_client.subscribe_trades(create_model, "IWM")
 
         wss_client.run()
 
