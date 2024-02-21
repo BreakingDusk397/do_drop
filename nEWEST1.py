@@ -522,7 +522,7 @@ def get_inventory_risk(symbol):
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "IWM":
-            inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance)) + inventory_risk_roc_norm - inventory_derivative_norm
+            inventory_risk = (0.5 * (abs(inventory_qty)/100) * (1 - current_variance)) + inventory_risk_roc_norm - inventory_derivative_norm
             print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
             
 
@@ -799,6 +799,10 @@ def cancel_orders_for_side(symbol, side):
 # Matches current, available positions with limit orders
 def match_orders_for_symbol(symbol):
 
+    global res
+
+    res = res
+
     qty = 1
 
     res = abs(res)
@@ -1018,9 +1022,9 @@ def create_features(dataset):
 
        
 
-        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 10)
+        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100)
 
-        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 10)
+        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100)
 
         #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact'] / 2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) * ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
 
@@ -1216,10 +1220,10 @@ def make_model(dataset, symbol, side):
 
         dataset['inventory_risk_roc'] = (s**2 * (g / k + 1) ** (k / g + 1) * ((k / g + 1) / (k * (g / k + 1)) - (k * np.log((g / k + 1))) / g ** 2) * (m / (g * s**2) + 1 / 2 * (1 - 2 * q))) / (2 * np.sqrt(2) * a * np.sqrt((s**2 * (g / k + 1)**(k / g + 1)) / a)) - (m * np.sqrt(((s**2 * (g / k + 1)**(k / g + 1)) / a ))) / (np.sqrt(2) * g**2 * s**2) - np.log((g / k + 1)) / g ** 2 + 1 / (g * k * (g / k + 1))
         dataset['inventory_risk_roc_norm'] = ((2 * ((dataset['inventory_risk_roc'] - dataset['inventory_risk_roc'].min()) / (dataset['inventory_risk_roc'].max() - dataset['inventory_risk_roc'].min()))) - 1)
-        inventory_risk_roc_norm = dataset['inventory_risk_roc_norm'][-1:]
+        inventory_risk_roc_norm = dataset['inventory_risk_roc'][-1:] + 0.0000001 / 100000
         dataset['inventory_derivative'] = -(np.sqrt((((1 + g / k)**(1 + k / g) * s**2) / a)) / np.sqrt(2))
         dataset['inventory_derivative_norm'] = ((2 * ((dataset['inventory_derivative'] - dataset['inventory_derivative'].min()) / (dataset['inventory_derivative'].max() - dataset['inventory_derivative'].min()))) - 1)
-        inventory_derivative_norm = dataset['inventory_derivative'][-1:]
+        inventory_derivative_norm = dataset['inventory_derivative'][-1:] + 0.0000001 / 100000
         print("\n inventory_risk_roc: \n", dataset['inventory_risk_roc_norm'][-1:])
         print("\n inventory_derivative_norm: \n", dataset['inventory_derivative_norm'][-1:])
 
@@ -1702,7 +1706,7 @@ async def create_model(data):
 
     now1 = datetime.now()
     print('\n ------- Current Local Machine Time ------- \n', now1)
-    match_orders_for_symbol(symbol='IWM')
+    #match_orders_for_symbol(symbol='IWM')
 
 
 while True:
