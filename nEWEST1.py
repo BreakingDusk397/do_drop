@@ -143,17 +143,28 @@ ask_price_list_AMD5 = pd.DataFrame()
 current_vwap = 200
 symbol = "IWM"
 BASE_URL = "https://paper-api.alpaca.markets"
-A_KY = os.environ['ALPACA_API_KEY']
-S_KY = os.environ['ALPACA_SECRET_API_KEY']
+#A_KY = os.environ['ALPACA_API_KEY']
+#S_KY = os.environ['ALPACA_SECRET_API_KEY']
+#wss_client = CryptoDataStream(A_KY, S_KY)
+#trading_client = TradingClient(A_KY, S_KY, paper=True)
+#symbol = symbol
+#totp_key = os.environ['PYOTP']
+#totp = pyotp.TOTP(totp_key).now()
+#un = os.environ['ROBINHOOD_USERNAME']
+#pw = os.environ['ROBINHOOD_PASS']
+#login = r.login(un,pw, mfa_code=totp)
+
+
+BASE_URL = "https://paper-api.alpaca.markets"
+A_KY = "PKCSSHRBEDBBETRCTIC0"
+S_KY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
 wss_client = CryptoDataStream(A_KY, S_KY)
 trading_client = TradingClient(A_KY, S_KY, paper=True)
 symbol = symbol
-totp_key = os.environ['PYOTP']
-totp = pyotp.TOTP(totp_key).now()
-un = os.environ['ROBINHOOD_USERNAME']
-pw = os.environ['ROBINHOOD_PASS']
+totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
+un = "torndoff@icloud.com"
+pw = "qu2t3f8Ew9BxM"
 login = r.login(un,pw, mfa_code=totp)
-
 #login = r.login(un,pw, mfa_code=totp)
 
 
