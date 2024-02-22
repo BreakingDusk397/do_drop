@@ -156,8 +156,8 @@ BASE_URL = "https://paper-api.alpaca.markets"
 
 
 BASE_URL = "https://paper-api.alpaca.markets"
-A_KY = "PKCSSHRBEDBBETRCTIC0"
-S_KY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
+A_KY = "PKO0NDZB5CRIBPFOGKDB"
+S_KY = "62ART64miYh7zrFif70TqEERN109evAyNbQ2XQGk"
 wss_client = CryptoDataStream(A_KY, S_KY)
 trading_client = TradingClient(A_KY, S_KY, paper=True)
 symbol = symbol
