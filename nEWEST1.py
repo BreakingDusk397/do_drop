@@ -87,6 +87,7 @@ import asyncio
 import warnings
 from alpaca.data.live import StockDataStream, CryptoDataStream
 warnings.filterwarnings('ignore')
+import os
 
 from numba import jit
 from scipy.signal import savgol_filter
@@ -142,14 +143,17 @@ ask_price_list_AMD5 = pd.DataFrame()
 current_vwap = 200
 symbol = "IWM"
 BASE_URL = "https://paper-api.alpaca.markets"
-A_KY = "PKCSSHRBEDBBETRCTIC0"
-S_KY = "i6WIXV53Rz6HlbVbUmQRg344sVefIfI8diiTuZcW"
-wss_client = StockDataStream(A_KY, S_KY)
+A_KY = os.environ['ALPACA_API_KEY']
+S_KY = os.environ['ALPACA_SECRET_API_KEY']
+wss_client = CryptoDataStream(A_KY, S_KY)
 trading_client = TradingClient(A_KY, S_KY, paper=True)
 symbol = symbol
-totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
-u = "torndoff"
-p = "qu2t3f"
+totp_key = os.environ['PYOTP']
+totp = pyotp.TOTP(totp_key).now()
+un = os.environ['ROBINHOOD_USERNAME']
+pw = os.environ['ROBINHOOD_PASS']
+login = r.login(un,pw, mfa_code=totp)
+
 #login = r.login(un,pw, mfa_code=totp)
 
 
@@ -219,12 +223,8 @@ def d_vwap(c,v):
 #@jit(cache=True, nopython=True)
 def exp_decay(k,A,delta,c):
     return A * np.exp(-k * delta) + c
-n = "@icloud.com"
 
-w = "8Ew9BxM"
-pw = p+w
-un = u+n
-login = r.login(un,pw, mfa_code=totp)
+
 # A looped async function that will place n-orders away from the midpoint, log the time until hit, and fit the data to an exponential decay curve.
 # This will give us the variables A and k for the optimal bid and ask spread
 # Currently not working as intended
