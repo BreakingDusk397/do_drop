@@ -533,7 +533,8 @@ def get_inventory_risk(symbol):
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "IWM":
-            inventory_risk = (0.5 * (abs(inventory_qty)/100) * (1 - current_variance)) + inventory_risk_roc_norm - inventory_derivative_norm
+            inventory_risk = (0.5 * (abs(inventory_qty)/100) * (1 - current_variance)) 
+            #+ inventory_risk_roc_norm - inventory_derivative_norm
             print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
             
 
