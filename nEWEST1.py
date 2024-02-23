@@ -142,7 +142,7 @@ ask_price_list5 = pd.DataFrame()
 ask_price_list_AMD5 = pd.DataFrame()
 current_vwap = 200
 symbol = "IWM"
-BASE_URL = "https://paper-api.alpaca.markets"
+#BASE_URL = "https://paper-api.alpaca.markets"
 #A_KY = os.environ['ALPACA_API_KEY']
 #S_KY = os.environ['ALPACA_SECRET_API_KEY']
 #wss_client = CryptoDataStream(A_KY, S_KY)
@@ -156,9 +156,9 @@ BASE_URL = "https://paper-api.alpaca.markets"
 
 
 BASE_URL = "https://paper-api.alpaca.markets"
-A_KY = "PKO0NDZB5CRIBPFOGKDB"
-S_KY = "62ART64miYh7zrFif70TqEERN109evAyNbQ2XQGk"
-wss_client = CryptoDataStream(A_KY, S_KY)
+A_KY = "PKZSWAH6VTU3RKBXS379"
+S_KY = "jBWJSgfKGXXGDZTYqimYjtDO9necMsqwPqcqHTnh"
+wss_client = StockDataStream(A_KY, S_KY)
 trading_client = TradingClient(A_KY, S_KY, paper=True)
 symbol = symbol
 totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
