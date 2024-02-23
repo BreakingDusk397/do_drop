@@ -100,7 +100,7 @@ print(datetime.now())
 
 # Required initial values
 
-respampling_period = 20
+respampling_period = 5
 res = 0
 column_price = 'open'
 column_high = 'high'
@@ -533,7 +533,8 @@ def get_inventory_risk(symbol):
         inventory_qty = int(ORDERS[1][6])
 
         if symbol == "IWM":
-            inventory_risk = (0.5 * (abs(inventory_qty)/100) * (1 - current_variance)) 
+            inventory_risk = (1 * (abs(inventory_qty)/1000))
+                              #* (1 - current_variance)) 
             #+ inventory_risk_roc_norm - inventory_derivative_norm
             print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
             
@@ -1440,13 +1441,15 @@ def make_model(dataset, symbol, side):
 
         X_train, X_test, y_train, y_test = train_test_split(dataset[-(len(y)):], y, test_size = 0.5, random_state = 42, shuffle=False)
         X_valid, X_test2, y_valid, y_test2 = train_test_split(X_test, y_test, test_size = 0.5, random_state = 42, shuffle=False)
+        X_valid2, X_test3, y_valid2, y_test3 = train_test_split(X_test2, y_test2, test_size = 0.5, random_state = 42, shuffle=False)
 
 
         
         
         train_dataset = cb.Pool(X_train, y_train)
-        test_dataset = cb.Pool(X_test2, y_test2)
-        valid_dataset = cb.Pool(X_valid, y_valid)
+        test_dataset = cb.Pool(X_test3, y_test3)
+        cross_valid_dataset = (X_valid, y_valid)
+        metric_dataset = cb.Pool(X_valid2, y_valid2)
         
         catboost_class = CatBoostClassifier(iterations=500, early_stopping_rounds=5, silent=True, thread_count=-1)
         """
@@ -1455,7 +1458,7 @@ def make_model(dataset, symbol, side):
             catboost_class = CatBoostClassifier()      # parameters not required.
             catboost_class.load_model(f'model_{symbol}_{side}')
             """
-        selected_features = catboost_class.select_features(train_dataset, eval_set=valid_dataset, features_for_select=list(dataset.columns), num_features_to_select=30, steps=4, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
+        selected_features = catboost_class.select_features(train_dataset, eval_set=test_dataset, features_for_select=list(dataset.columns), num_features_to_select=30, steps=4, algorithm='RecursiveByShapValues', shap_calc_type='Approximate', train_final_model=True, logging_level='Silent')
         print('\n selected_features: \n', selected_features['selected_features_names'])
         #catboost_class.select_features(train_dataset, eval_set=test_dataset, num_features_to_select=50, steps=10, algorithm='RecursiveByShapValues', train_final_model=True,)
 
@@ -1481,16 +1484,16 @@ def make_model(dataset, symbol, side):
 
             
         }
-        tscv = TimeSeriesSplit(n_splits=3, gap=1)
+        tscv = TimeSeriesSplit(n_splits=5, gap=1)
         rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=25, max_resources=500, cv=tscv, verbose=1, scoring='f1')
 
-        rscv.fit(X_test2, y_test2)
+        rscv.fit(X_valid, y_valid)
 
         best_params = rscv.best_params_
         print("\n best params: \n", rscv.best_params_, rscv.best_score_)
 
         catboost_class = rscv.best_estimator_
-        metric(y_test, catboost_class.predict(X_test))
+        metric(y_test, catboost_class.predict(X_valid2))
 
 
         model = catboost_class
