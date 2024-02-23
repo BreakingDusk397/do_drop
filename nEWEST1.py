@@ -549,7 +549,21 @@ def get_inventory_risk(symbol):
 
         print("No inventory position.")
         inventory_qty = 1
-        inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance)) + inventory_risk_roc_norm - inventory_derivative_norm
+
+        if symbol == "IWM":
+            inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance))
+                              #* (1 - current_variance)) 
+            #+ inventory_risk_roc_norm - inventory_derivative_norm
+            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
+            
+
+        if symbol == 'SPY':
+            inventory_risk = 0.01 * abs(inventory_qty)
+            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
+
+
+        inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance))
+        #+ inventory_risk_roc_norm - inventory_derivative_norm
         #print(traceback.format_exc())
         print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
         return inventory_risk
@@ -1493,7 +1507,7 @@ def make_model(dataset, symbol, side):
         print("\n best params: \n", rscv.best_params_, rscv.best_score_)
 
         catboost_class = rscv.best_estimator_
-        metric(y_test, catboost_class.predict(X_valid2))
+        metric(y_valid2, catboost_class.predict(X_valid2))
 
 
         model = catboost_class
