@@ -1049,9 +1049,9 @@ def create_features(dataset):
 
        
 
-        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100)
+        dataset['bid_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (- dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) + (2 * dataset['inventory'] + 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['bid_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 1000)
 
-        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 100)
+        dataset['ask_spread_aysm2'] = ((1 / dataset['gamma'] * np.log(1 + dataset['gamma'] / dataset['k']) + (  dataset["mu"] / (dataset['gamma'] * dataset['sigma']**2) - (2 * dataset['inventory'] - 1) / 2) * np.sqrt((dataset['sigma']**2 * dataset['k']) / (2 * dataset['k'] * dataset['ask_alpha']) * (1 + dataset['gamma'] / dataset['k'])**(1 + dataset['k'] / dataset['gamma']))) / 1000)
 
         #dataset['bid_spread_aysm3'] = 1 / dataset['gamma'] * np.log( 1 + dataset['gamma']/dataset['k'] ) + dataset['market_impact'] / 2 + (2 * dataset['inventory'] + 1)/2 * np.exp((dataset['k']/4) * dataset['market_impact']) * np.sqrt( ((dataset['sigma'] * 2 * dataset['gamma']) / (2 * dataset['k'] * dataset['bid_alpha'])) * ( 1 + dataset['gamma'] * dataset['k'] )**(1+ dataset['k'] * dataset['gamma']) )
 
@@ -1276,11 +1276,11 @@ def make_model(dataset, symbol, side):
 
 
         # initial asset value
-        S0 = dataset['open'][-1:].values.reshape(-1, 1)
+        S0 = dataset['close'][-1:].values.reshape(-1, 1)
         # option strike 
         K = 100.0
         # continuously compounded risk free rate for 1 second; annualized / seconds * tradings mins * trading days
-        R = 0.07 / (60.0 * 420 * 252)
+        R = 0.05375 / ((60.0 * 1 / respampling_period) * 420 * 252)
 
         sigma = dataset['variance'][-1:].values.reshape(-1, 1)
 
@@ -1298,14 +1298,74 @@ def make_model(dataset, symbol, side):
         dataset['median_path'] = np.median(paths[-1])
         dataset['std_path'] = np.std(paths[-1])
 
-        print('\n open: \n', dataset['open'][-1])
+        print('\n open: \n', dataset['close'][-1])
         print('\n avg_path: \n', dataset['avg_path'][-1])
         print('\n median_path: \n', dataset['median_path'][-1])
         print('\n std_path: \n', dataset['std_path'][-1])
 
 
 
+        # Another implementation of a monte carlo simulation of geometric brownian motion adapted from github
+        # Todo: fix the plots
+        # fix the prediction, currently its only outputing one timestep instead of the expected ten
 
+        scen_size = 10000
+
+        # download and prepare data
+        prices = dataset['close']
+        train_set = prices[:-1]
+        test_set = prices[-1:]
+        step_returns = ((train_set / train_set.shift(1)) - 1)[1:]
+
+        # Geometric Brownian Motion (GBM)
+
+        # Parameter Definitions
+
+        # So    :   initial stock price
+        # dt    :   time increment -> a day in our case
+        # T     :   length of the prediction time horizon(how many time points to predict, same unit with dt(days))
+        # N     :   number of time points in prediction the time horizon -> T/dt
+        # t     :   array for time points in the prediction time horizon [1, 2, 3, .. , N]
+        # mu    :   mean of historical daily returns
+        # sigma :   standard deviation of historical daily returns
+        # b     :   array for brownian increments
+        # W     :   array for brownian path
+
+
+        # Parameter Assignments
+        So = dataset['close'][-1]
+        dt = 1  # day   # User input
+        n_of_wkdays = len(dataset)
+        T = 1
+        N = T / dt
+        t = np.arange(1, int(N) + 1)
+        mu = dataset['close'].pct_change().rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})[-1:].values
+        sigma = dataset['variance'].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})[-1:].values
+        b = {str(scen): np.random.normal(0, 1, int(N)) for scen in range(1, scen_size + 1)}
+        W = {str(scen): b[str(scen)].cumsum() for scen in range(1, scen_size + 1)}
+
+
+        # Calculating drift and diffusion components
+        drift = (mu - 0.5 * sigma ** 2) * t
+        diffusion = {str(scen): sigma * W[str(scen)] for scen in range(1, scen_size + 1)}
+
+        # Making the predictions
+        S = np.array([So * np.exp(drift + diffusion[str(scen)]) for scen in range(1, scen_size + 1)])
+        S = np.hstack((np.array([[So] for scen in range(scen_size)]), S))  # add So to the beginning series
+        S_max = [S[:, i].max() for i in range(0, int(N))]
+        S_min = [S[:, i].min() for i in range(0, int(N))]
+        S_pred = .5 * np.array(S_max) + .5 * np.array(S_min)
+        print("\n S_pred: \n", S_pred)
+
+        dataset['S_pred_avg'] = S_pred
+
+        final_df = pd.DataFrame(data=[test_set.reset_index()['close'], S_pred],
+                                index=['real', 'pred']).T
+        print("\n final_df: \n", final_df)
+        final_df.index = test_set.index
+        mse = 1/len(final_df) * np.sum((final_df['pred'] - final_df['real']) ** 2)
+        #print("\n mse: \n", mse)
+        
 
 
 
@@ -1450,20 +1510,19 @@ def make_model(dataset, symbol, side):
         #print('\n last dataset input: \n', dataset[-1:])
         #print('\n last y input: \n', y[-1:])
 
-        
+    
 
 
         X_train, X_test, y_train, y_test = train_test_split(dataset[-(len(y)):], y, test_size = 0.5, random_state = 42, shuffle=False)
-        X_valid, X_test2, y_valid, y_test2 = train_test_split(X_test, y_test, test_size = 0.5, random_state = 42, shuffle=False)
-        X_valid2, X_test3, y_valid2, y_test3 = train_test_split(X_test2, y_test2, test_size = 0.5, random_state = 42, shuffle=False)
-
+        X_valid, X_test, y_valid, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state = 42, shuffle=False) 
+        
 
         
         
         train_dataset = cb.Pool(X_train, y_train)
-        test_dataset = cb.Pool(X_test3, y_test3)
+        test_dataset = cb.Pool(X_test, y_test)
         cross_valid_dataset = (X_valid, y_valid)
-        metric_dataset = cb.Pool(X_valid2, y_valid2)
+        
         
         catboost_class = CatBoostClassifier(iterations=500, early_stopping_rounds=5, silent=True, thread_count=-1)
         """
@@ -1501,13 +1560,13 @@ def make_model(dataset, symbol, side):
         tscv = TimeSeriesSplit(n_splits=5, gap=1)
         rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=10, min_resources=25, max_resources=500, cv=tscv, verbose=1, scoring='accuracy')
 
-        rscv.fit(X_valid, y_valid)
+        rscv.fit(dataset[-(len(y)):], y)
 
         best_params = rscv.best_params_
         print("\n best params: \n", rscv.best_params_, rscv.best_score_)
 
         catboost_class = rscv.best_estimator_
-        metric(y_valid2, catboost_class.predict(X_valid2))
+        metric(y_valid, catboost_class.predict(X_valid))
 
 
         model = catboost_class
@@ -1537,11 +1596,14 @@ def make_model(dataset, symbol, side):
                 take_profit = res + (best_spread * 3)
                 if float(best_spread) > -0.01:
                     best_spread = best_spread + -0.05
-                stop_loss = res - (best_spread * 1)
-                stop_loss_limit = stop_loss - 0.01
+                stop_loss = res + (best_spread * 1)
+                stop_loss = stop_loss - 0.01
                 spread = best_spread
                 current_price = res
                 limit_price = round(current_price + spread, 2)
+
+                print('\n limit_price: \n', limit_price)
+                print('\n stop_loss: \n', stop_loss)
 
                 for i in range(1,5):
 
@@ -1565,7 +1627,7 @@ def make_model(dataset, symbol, side):
                 if float(best_spread) < 0.01:
                     best_spread = best_spread + 0.05
                 stop_loss = res + (best_spread * 1)
-                stop_loss_limit = stop_loss + 0.01
+                stop_loss = stop_loss + 0.01
                 spread = best_spread
                 current_price = res
                 limit_price = round(current_price + spread, 2)
@@ -1592,10 +1654,14 @@ def make_model(dataset, symbol, side):
                 if float(best_spread) < 0.01:
                     best_spread = best_spread + 0.05
                 stop_loss = res + (best_spread * 1)
-                stop_loss_limit = stop_loss + 0.01
+                stop_loss = stop_loss + 0.01
                 spread = best_spread
                 current_price = res
                 limit_price = round(current_price + spread, 2)
+
+                print('\n limit_price: \n', limit_price)
+                print('\n stop_loss: \n', stop_loss)
+
                 for i in range(1,5):
                         
                     limit_order(symbol=symbol, 
@@ -1611,13 +1677,12 @@ def make_model(dataset, symbol, side):
                 spread = -0.02
                 cancel_orders_for_side(symbol=symbol, side='sell')
                 best_spread = best_bid
-                stop_loss = res - (best_spread * 10)
-                stop_loss_limit = stop_loss - 0.01
+                
                 take_profit = res + (best_spread * 3)
                 if float(best_spread) > -0.01:
                     best_spread = best_spread + -0.05
-                stop_loss = res - (best_spread * 1)
-                stop_loss_limit = stop_loss - 0.01
+                stop_loss = res + (best_spread * 1)
+                stop_loss = stop_loss - 0.01
                 spread = best_spread
                 current_price = res
                 limit_price = round(current_price + spread, 2)
