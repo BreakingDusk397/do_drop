@@ -1357,13 +1357,14 @@ def make_model(dataset, symbol, side):
         S_pred = .5 * np.array(S_max) + .5 * np.array(S_min)
         print("\n S_pred: \n", S_pred)
 
-        dataset['S_pred_avg'] = S_pred
+        dataset['S_pred_avg'] = pd.Series(S_pred)
 
         final_df = pd.DataFrame(data=[test_set.reset_index()['close'], S_pred],
                                 index=['real', 'pred']).T
         print("\n final_df: \n", final_df)
         final_df.index = test_set.index
         mse = 1/len(final_df) * np.sum((final_df['pred'] - final_df['real']) ** 2)
+        dataset['S_pred_avg_mse'] = pd.Series(mse)
         #print("\n mse: \n", mse)
         
 
