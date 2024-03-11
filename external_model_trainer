@@ -464,7 +464,7 @@ def make_model(dataset, symbol, side):
         # Feature params
         
 
-        mid_price = (float(dataset['d_vwap'][-1]))
+        mid_price = (float(dataset['close'][-1]))
         
         dataset['future_return'] = dataset['close'].pct_change(future_period).shift(-future_period)
         
