@@ -51,41 +51,31 @@ import pandas as pd
 from matplotlib import cm, pyplot as plt
 import scipy
 from scipy.optimize import curve_fit
-import yfinance as yf
+
 from scipy.stats.mstats import winsorize
 import pandas as pd
 from scipy import stats
-from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import OrderSide, TimeInForce
+
 import pickle
 import datetime
 import concurrent.futures
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockLatestQuoteRequest
-from alpaca.data.requests import *
-from alpaca.data.timeframe import TimeFrame
-from alpaca.trading.requests import *
-from alpaca.trading.enums import OrderSide, TimeInForce
-from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import LimitOrderRequest
-import yfinance as yf
+
 import warnings
 import math
-from alpaca.trading.models import *
+
 import time
-import robin_stocks.robinhood as r
+
 from datetime import datetime
 from sklearn import linear_model
 import traceback
-import pyotp
+
 import catboost as cb
 from catboost import CatBoostClassifier
 from sklearn import metrics 
 from sklearn.model_selection import TimeSeriesSplit
 import asyncio
 import warnings
-from alpaca.data.live import StockDataStream, CryptoDataStream
+
 warnings.filterwarnings('ignore')
 import os
 
@@ -99,7 +89,7 @@ pd.set_option('display.width', 100)
 print(datetime.now())
 
 # Required initial values
-
+inventory_risk = 0.01
 respampling_period = 2
 res = 0
 column_price = 'open'
@@ -155,17 +145,7 @@ symbol = "IWM"
 #login = r.login(un,pw, mfa_code=totp)
 
 
-BASE_URL = "https://paper-api.alpaca.markets"
-A_KY = "PKZSWAH6VTU3RKBXS379"
-S_KY = "jBWJSgfKGXXGDZTYqimYjtDO9necMsqwPqcqHTnh"
-wss_client = StockDataStream(A_KY, S_KY)
-trading_client = TradingClient(A_KY, S_KY, paper=True)
-symbol = symbol
-totp  = pyotp.TOTP("HOPRBD4K5QWBMKCW").now()
-un = "torndoff@icloud.com"
-pw = "qu2t3f8Ew9BxM"
-login = r.login(un,pw, mfa_code=totp)
-#login = r.login(un,pw, mfa_code=totp)
+
 
 
 # Generates geometric brownian paths with monte carlo simulation 
@@ -229,693 +209,6 @@ def np_vwap(h,l,v):
 # VWAP for 1D prices
 def d_vwap(c,v):
     return np.cumsum(v*c) / np.cumsum(v)
-
-# Fast exponential decay used for calibrating A and k
-#@jit(cache=True, nopython=True)
-def exp_decay(k,A,delta,c):
-    return A * np.exp(-k * delta) + c
-
-
-# A looped async function that will place n-orders away from the midpoint, log the time until hit, and fit the data to an exponential decay curve.
-# This will give us the variables A and k for the optimal bid and ask spread
-# Currently not working as intended
-async def calibrate_params(symbol):
-    while True:
-
-        # Set variables
-        order_id_list_buy = []
-        order_id_list_sell = []
-        order_i_list_buy = []
-        order_i_list_sell = []
-        duration_buy = []
-        duration_sell = []
-        
-        # Allow the local variable to be set as the global variable to be used later on
-        global a
-        global k
-
-
-        try:    
-            #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)
-            midpoint = current_vwap
-            for i in range(1,5):
-
-                market_order_data = LimitOrderRequest(
-                                symbol=symbol,
-                                qty=1,
-                                side=OrderSide.BUY,
-                                type='limit',
-                                time_in_force=TimeInForce.GTC,
-                                limit_price = round((float(midpoint) - float(i)/100.0), 2),
-                                
-                                
-                            )
-                limit_order_data = trading_client.submit_order(market_order_data)
-                
-                time.sleep(4)
-
-            time.sleep(60)
-            limit_order_data = pd.DataFrame(limit_order_data)
-            #print("\n limit_order_data: \n", limit_order_data)
-            order_id = limit_order_data[1][1]
-
-            order_id_list_buy.append(order_id)
-            order_i_list_buy.append(i)
-
-            for i in order_id_list_buy:
-                order = pd.DataFrame(trading_client.get_order_by_client_id(i))
-                print("\n order: \n", order)
-                order_begin = order[1][2]
-                order_end = order[1][5]
-
-                if order_end == None:
-                    duration = 100
-                else:
-                    duration = order_end - order_begin
-
-                if duration == None:
-                    duration = 100
-                duration_buy.append(str(duration))
-                
-                # The sell side of the calibration problem that is depreciated until I can get the buy side working as intended.
-                """
-                market_order_data = LimitOrderRequest(
-                                symbol=symbol,
-                                qty=1,
-                                side=OrderSide.SELL,
-                                type='limit',
-                                time_in_force=TimeInForce.GTC,
-                                limit_price = round((float(midpoint) + float(i)/100.0), 2),
-                                #take_profit={'limit_price': round((limit_price+ (spread*take_profit_multiplier)), 2)},
-                                #stop_loss={'stop_price': round((limit_price+ (spread*loss_stop_multiplier)), 2),
-                                #'limit_price':  round((limit_price+ (spread*loss_limit_multiplier)), 2)},
-                                
-                            )
-                limit_order_data = trading_client.submit_order(market_order_data)
-                time.sleep(1)
-                limit_order_data = pd.DataFrame(limit_order_data)
-                order_id = limit_order_data[1][1]
-                
-
-                order_id_list_sell.append(order_id)
-                order_i_list_sell.append(i)
-
-            
-
-            for i in order_id_list_sell:
-                order = pd.DataFrame(trading_client.get_order_by_client_id(i))
-                order_begin = order[1][2]
-                order_end = order[1][5]
-
-                duration = order_end - order_begin
-                duration_sell.append(duration)
-
-
-
-            X_sell = order_i_list_sell.reverse()
-            y_sell = duration_sell.reverse()
-            popt_sell, pcov_sell = curve_fit(exp_decay, X_sell, y_sell, p0=(1,1,1))
-            print("\n Calculated parameters for ", symbol, " selling side: ", popt_sell)
-            """
-
-            
-            
-            X = order_i_list_buy.reverse()
-            y = duration_buy.reverse()
-
-            print(X)
-            print(y)
-
-            X = X.replace([np.inf, -np.inf], np.nan)
-            X = X.fillna(100)
-            y = y.replace([np.inf, -np.inf], np.nan)
-            y = y.fillna(100)
-            popt, pcov = curve_fit(exp_decay, X, y, p0=(1,1,1))
-
-            
-
-            print("\n Calculated parameters for ", symbol, " buying side: ", popt)
-            
-
-            calibrate_params_previous = popt
-
-        except:
-            print("\n Calibrating k, A error... \n")
-            print(traceback.format_exc()) 
-
-        await asyncio.sleep(300)
-
-# Downloads price data from yahoo finance
-def yf_download(symbol):
-    global yf_download_previous
-
-    try:
-        
-        df_orderbook = pd.DataFrame(yf.download(symbol, period="1d", interval="1m"))
-        yf_download_previous = df_orderbook # Creates a variable that stores the previous version of df_orderbook for when Yahoo denies the request
-        return df_orderbook
-    
-    except:
-        return yf_download_previous
-
-# Connects to Robinhood's API and extracts Lvl 2 orderbook data
-def get_pricebook(symbol):
-
-
-    
-    try:
-        
-
-
-        data = r.stocks.get_pricebook_by_symbol(symbol=symbol)
-
-        
-        #print(pd.DataFrame.from_dict(data['asks']))
-        all_prices = [dct["price"] for dct in data["asks"]]
-        all_amounts = [dct["amount"] for dct in all_prices]
-        
-        x = pd.DataFrame.from_dict(data['asks'])
-        x['price'] = all_amounts
-        all_prices = [dct["price"] for dct in data["bids"]]
-        all_amounts = [dct["amount"] for dct in all_prices]
-        
-
-        y = pd.DataFrame.from_dict(data['bids'])
-
-        y['price'] = all_amounts
-        best_ask = float(x['price'][0])
-        best_bid = float(y['price'][0])
-
-        midpoint = (best_ask + best_bid)/2
-        x['midpoint'] = float(midpoint)
-        x['price'].apply(lambda x: float(x))
-
-        x['delta'] = pd.to_numeric(x['price']) - x['midpoint']
-        x['delta'] = abs(x['delta'])
-        x['delta'] = pow(x['delta'], -1)
-        x['delta_volume'] = x['delta'] * x['quantity']
-        x = x[:10]
-        ask_sum_delta_vol = x['delta_volume'].sum() * len(x)
-        #print(ask_sum_delta_vol)
-        y['midpoint'] = float(midpoint)
-        y['price'].apply(lambda y: float(y))
-        y['delta'] = pd.to_numeric(y['price']) - y['midpoint']
-        y['delta'] = abs(y['delta'])
-        y['delta'] = pow(y['delta'], -1)
-        y['delta_volume'] = y['delta'] * y['quantity']
-        y = y[:10]
-        bid_sum_delta_vol = y['delta_volume'].sum() * len(y)
-        #print(bid_sum_delta_vol)
-
-        alpha = abs((ask_sum_delta_vol - bid_sum_delta_vol) / ((bid_sum_delta_vol + ask_sum_delta_vol)/2))
-        ask_alpha = (ask_sum_delta_vol - bid_sum_delta_vol) / ((bid_sum_delta_vol + ask_sum_delta_vol)/2)
-        if ask_alpha <= 0:
-            ask_alpha = 0.002
-        bid_alpha = (bid_sum_delta_vol - ask_sum_delta_vol) / ((bid_sum_delta_vol + ask_sum_delta_vol)/2)
-        if bid_alpha <= 0:
-            bid_alpha = 0.002
-        #print("alpha:", alpha)
-        
-        return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
-        
-
-    except:
-        ask_alpha = 0.5
-        bid_alpha = 0.5
-        bid_sum_delta_vol = 10000
-        ask_sum_delta_vol = 10000
-        midpoint = 999
-        print(traceback.format_exc())
-        return ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint
-
-    
-
-
-    
-
-# Retrieves current inventory position for a given symbol from Alpaca
-# Preferred return inventory method
-def get_inventory(symbol):
-
-    t = time.process_time()
-
-    
-    
-
-    try:
-        #df_orderbook = yf_download()
-        #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook(symbol)  
-        symbol = symbol
-        trading_client = TradingClient(A_KY, S_KY, paper=True)
-        position = trading_client.get_open_position(symbol)
-        ORDERS = pd.DataFrame(position)
-        inventory_qty = int(ORDERS[1][6])
-
-        elapsed_time = time.process_time() - t
-        print('\n Time to ordebook method: \n', elapsed_time)
-
-        return inventory_qty
-
-    except:
-        #df_orderbook = yf_download_previous
-        #ask_alpha, bid_alpha, bid_sum_delta_vol, ask_sum_delta_vol, midpoint = get_pricebook.previous
-
-        print("No inventory position.")
-        inventory_qty = 1
-        #print(traceback.format_exc())
-        elapsed_time = time.process_time() - t
-        print('\n Time to ordebook method: \n', elapsed_time)
-
-        return inventory_qty
-
-
-
-
-
-
-
-# Calculates the current remaining time until the trading session closes
-def get_time_til_close(symbol):
-
-    try:
-        symbol = symbol
-        now = datetime.now()
-        trading_client = TradingClient(A_KY, S_KY, paper=True)
-        
-
-        if int(now.hour) > 21:
-            if int(now.minute) > 57:
-                cancel_orders_for_symbol(symbol=symbol)
-                trading_client.close_position(symbol)
-                
-    except:
-        print("get_time_til_close exception. It's not trading time...")
-        #print(traceback.format_exc())
-        
-# Calculates the inventory risk (aka gamma) for any given symbol
-# Smaller gamma means a higher ask and a lower bid. As gamma approaches
-# Typical gamma values are 0.001 to 1
-def get_inventory_risk(symbol):
-
-    
-    try:
-        inventory_qty = 1
-        symbol = str(symbol)
-
-        trading_client = TradingClient(A_KY, S_KY, paper=True)
-    
-        position = trading_client.get_open_position(symbol)
-        ORDERS = pd.DataFrame(position)
-
-
-
-
-        inventory_qty = int(ORDERS[1][6])
-
-        if symbol == "IWM":
-            inventory_risk = (1 * (abs(inventory_qty)/1000))
-                              #* (1 - current_variance)) 
-            #+ inventory_risk_roc_norm - inventory_derivative_norm
-            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
-            
-
-        if symbol == 'SPY':
-            inventory_risk = 0.01 * abs(inventory_qty)
-            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
-        
-        return inventory_risk
-
-    except:
-
-        print("No inventory position.")
-        inventory_qty = 1
-
-        if symbol == "IWM":
-            inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance))
-                              #* (1 - current_variance)) 
-            #+ inventory_risk_roc_norm - inventory_derivative_norm
-            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
-            
-
-        if symbol == 'SPY':
-            inventory_risk = 0.01 * abs(inventory_qty)
-            print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
-
-
-        inventory_risk = (1 * (abs(inventory_qty)/100) * (1 - current_variance))
-        #+ inventory_risk_roc_norm - inventory_derivative_norm
-        #print(traceback.format_exc())
-        print("\n Current", inventory_qty, inventory_risk, "inventory and risk. \n")
-        return inventory_risk
-        
-    
-            
-            
-    
-
-    
-
-# Retrieves current inventory position for a given symbol from Alpaca
-# Old and depreciated.
-def get_open_position(symbol):
-
-    try:
-        symbol = symbol
-        trading_client = TradingClient(A_KY, S_KY, paper=True)
-    
-        position = trading_client.get_open_position(symbol)
-        ORDERS = pd.DataFrame(position)
-    
-        inventory_qty = int(ORDERS[1][6])
-
-        side = str(ORDERS[1][7])
-        qty = float(ORDERS[1][20])
-        print("\n Current", qty, side, "position. \n")
-        return inventory_qty
-
-        
-    except:
-
-        print("No inventory position.")
-        inventory_qty = 1
-        #print(traceback.format_exc())
-        print("\n Current", qty, side, "position. \n")
-        return inventory_qty
-
-
-        
-
-def take_profit_method2(symbol):
-
-        try:
-            
-            
-            symbol = symbol
-            trading_client = TradingClient(A_KY, S_KY, paper=True)
-            position = trading_client.get_open_position(symbol)
-            ORDERS = pd.DataFrame(position)
-
-            cancel_orders_for_symbol(symbol)
-            
-
-            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-
-            
-            
-            if float(ORDERS[1][12]) >=  6:
-                
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-
-            if float(ORDERS[1][12]) <=  -5:
-
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-        except:
-            print ("\n take_profit_method error. \n")
-
-
-
-# A looped, background async method that checks the total, current profit for a given symbol every three seconds
-# and closes it with market orders if above a certain threshold.
-async def take_profit_method(symbol):
-    while True:
-        try:
-            
-            
-            symbol = symbol
-            trading_client = TradingClient(A_KY, S_KY, paper=True)
-            position = trading_client.get_open_position(symbol)
-            ORDERS = pd.DataFrame(position)
-
-            cancel_orders_for_symbol(symbol)
-            
-
-            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) >=  0.06:
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-
-            
-            
-            if float(ORDERS[1][12]) >=  6:
-                
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-
-            if float(ORDERS[1][12]) <=  -5:
-
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-                
-            await asyncio.sleep(3)
-            
-            # Depreciated stop-loss closing conditions
-            """
-            if float(ORDERS[1][10]) / abs(float(ORDERS[1][6])) <=  -0.12:
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-
-            if float(ORDERS[1][12]) <=  -13:
-
-                cancel_orders_for_symbol(symbol=symbol)
-                
-                trading_client.close_position(symbol)
-
-
-            elif str(ORDERS[1][7]) ==  "PositionSide.LONG":
-
-                if float(ORDERS[1][5]) - float(ORDERS[1][14]) <= -0.1:
-                    cancel_orders_for_symbol(symbol=symbol)
-                    
-                    trading_client.close_position(symbol)
-                    
-
-                if float(ORDERS[1][5]) - float(ORDERS[1][14]) >= 0.1:
-                    cancel_orders_for_symbol(symbol=symbol)
-                    
-                    trading_client.close_position(symbol)
-                    
-
-
-            elif str(ORDERS[1][7]) ==  "PositionSide.SHORT":
-
-                if float(ORDERS[1][5]) - float(ORDERS[1][14]) >= 0.1:
-                    cancel_orders_for_symbol(symbol=symbol)
-                    
-                    trading_client.close_position(symbol)
-                    
-
-                if float(ORDERS[1][5]) - float(ORDERS[1][14]) <= -0.1:
-                    cancel_orders_for_symbol(symbol=symbol)
-                    
-                    trading_client.close_position(symbol)"""
-                    
-
-        except:
-            print ("\n take_profit_method error. \n")
-            
-            await asyncio.sleep(3)
-
-
-
-
-
-
-order_list = []
-
-# Sends a bracket, limit order including a loose stop-loss and a tight take-profit through Alpaca
-def limit_order(symbol, limit_price, side, take_profit, stop_loss, qty, inventory_risk):
-    global order_list
-    symbol = str(symbol)
-    
-    market_order_data = LimitOrderRequest(
-                    symbol=symbol,
-                    qty=int(qty),
-                    side=side,
-                    type='limit',
-                    order_class = OrderClass.BRACKET,
-                    time_in_force=TimeInForce.GTC,
-                    limit_price = round(limit_price, 2),
-                    take_profit=TakeProfitRequest(limit_price=round(take_profit, 2)),
-                    stop_loss=StopLossRequest(stop_price = round(stop_loss, 2))
-                )
-    limit_order_data = trading_client.submit_order(market_order_data)
-
-    limit_order_data = pd.DataFrame(limit_order_data)
-
-    order_id = limit_order_data[1]
-                
-
-    order_list.append(order_id)
-
-    #print("spread, limit_price: ", spread, limit_price)
-    #print(limit_order_data)
-
-
-
-
-            
-    
-    
-    
-
-    
-# Cancels all orders for both BUY and SELL sides for a given symbol
-def cancel_orders_for_symbol(symbol):
-
-    try:
-        
-        trading_client = TradingClient(A_KY, S_KY, paper=True)
-        get_order = GetOrdersRequest(symbols=[symbol], limit=500)
-        ORDERS = trading_client.get_orders(get_order)
-        ORDERS = pd.DataFrame.from_records(ORDERS)
-        #print("\n ORDERS for cancel_for_symbol: \n", ORDERS)
-        ORDERS = ORDERS[0]
-        ORDERS1 = []
-        for i in range(0,len(ORDERS)):
-            ORDERS2 = ORDERS[i]
-            ORDERS2 = ORDERS2[1]
-            
-            ORDERS1.append(ORDERS2)
-        #print(ORDERS1)
-
-        for i in ORDERS1:
-            trading_client.cancel_order_by_id(i)
-
-    except:
-        print("cancel_orders_for_symbol exception")
-        #print(traceback.format_exc())
-        
-
-# Cancels all orders for one BUY or SELL side for a given symbol
-def cancel_orders_for_side(symbol, side):
-
-    try:
-
-        trading_client = TradingClient(A_KY, S_KY, paper=True)
-        get_order = GetOrdersRequest(symbols=[symbol], limit=500, side=side)
-        ORDERS = trading_client.get_orders(get_order)
-        ORDERS = pd.DataFrame.from_records(ORDERS)
-        #print("order for side", ORDERS)
-        ORDERS = ORDERS[0]
-        ORDERS1 = []
-        for i in range(0,len(ORDERS)):
-            ORDERS2 = ORDERS[i]
-            ORDERS2 = ORDERS2[1]
-            
-            ORDERS1.append(ORDERS2)
-        #print(ORDERS1)
-
-        for i in ORDERS1:
-            trading_client.cancel_order_by_id(i)
-
-    except:
-        print("cancel_orders_for_side exception")
-        #print(traceback.format_exc())
-        pass
-
-# Matches current, available positions with limit orders
-def match_orders_for_symbol(symbol):
-
-    global res
-
-    res = res
-
-    qty = 1
-
-    res = abs(res)
-
-    try:
-        symbol = symbol
-        trading_client = TradingClient(A_KY, S_KY, paper=True)
-        ORDERS = trading_client.get_open_position(symbol)
-        
-
-    except:    
-        print("\n match_orders_for_symbol() exception, probably no inventory present. \n")  
-        print(traceback.format_exc())   
-        
-
-
-    ORDERS = pd.DataFrame(ORDERS)
-    #print('\n ORDERS: \n',ORDERS)
-    side = str(ORDERS[1][7])
-    qty = float(ORDERS[1][20])
-    qty = abs(qty)
-    
-    
-    cancel_orders_for_symbol(symbol)
-
-    if str(side) == 'PositionSide.SHORT':
-
-        spread = -0.02
-        #cancel_orders_for_side(symbol=symbol, side='sell')
-        best_spread = best_bid
-        
-        if float(best_spread) > -0.01:
-            best_spread = round((best_spread - 0.05), 2)
-            
-        stop_loss = abs(round((res + (best_spread * 100)), 2))
-        stop_loss_limit = abs(round((stop_loss - 0.01), 2))
-        take_profit = abs(round((res - (best_spread * 3)), 2))
-        spread = round(best_spread, 2)
-        current_price = round(abs(res), 2)
-        limit_price = abs(round((current_price + spread), 2))
-
-        cancel_orders_for_side(symbol=symbol, side='buy')
-        
-        limit_order(symbol=symbol, 
-                    limit_price= round((limit_price), 2),
-                    side=OrderSide.SELL, 
-                    take_profit = round((take_profit), 2),
-                    stop_loss = round((stop_loss), 2),
-                    qty = abs(qty),
-                    inventory_risk = get_inventory_risk(symbol = symbol)
-                    )
-        print("\n Current", qty, side, "positions have been matched. \n")
-
-        
-    
-
-    if str(side) == 'PositionSide.LONG':
-        
-        cancel_orders_for_side(symbol=symbol, side='sell')
-
-        spread = -0.02
-        #cancel_orders_for_side(symbol=symbol, side='sell')
-        best_spread = best_ask
-        
-        if float(best_spread) < -0.01:
-            best_spread = round((best_spread + 0.05), 2)
-            
-        stop_loss = abs(round((res - (best_spread * 100)), 2))
-        stop_loss_limit = abs(round((stop_loss - 0.01), 2))
-        take_profit = abs(round((res + (best_spread * 3)), 2))
-        spread = round(best_spread, 2)
-        current_price = round(abs(res), 2)
-        limit_price = abs(round((current_price + spread), 2))
-
-    
-        limit_order(symbol=symbol, 
-                    limit_price= round((limit_price), 2),
-                    side=OrderSide.SELL, 
-                    take_profit = round((take_profit), 2),
-                    stop_loss = round((stop_loss), 2),
-                    qty = abs(qty),
-                    inventory_risk = get_inventory_risk(symbol = symbol)
-                    )
-        
-        print("\n Current", qty, side, "positions have been matched. \n")
-        
 
 
 
@@ -1177,7 +470,7 @@ def make_model(dataset, symbol, side):
         t0 = time.time()
 
         symbol = str(symbol)
-        get_time_til_close(symbol=symbol)
+        
 
 
         #best_bid, best_ask, midpoint, df, inventory_qty = get_orderbook(symbol = symbol)
@@ -1210,8 +503,7 @@ def make_model(dataset, symbol, side):
 
         dataset['vwap'] = np_vwap(h= dataset['high'].values,l= dataset['low'].values,v= dataset['volume'].values)
         dataset['D_vwap'] = d_vwap(c= dataset['open'].values,v= dataset['volume'].values)
-        dataset['inventory'] = get_inventory(symbol)
-        dataset['gamma'] = get_inventory_risk(symbol = symbol)
+        
 
 
         """
@@ -1397,7 +689,7 @@ def make_model(dataset, symbol, side):
         
 
         inventory = float(inventory_qty)
-        inventory_risk = float(get_inventory_risk(symbol))
+        
         variance = float(dataset["variance"][-1]) * 1000
         total_steps_in_day = float(420)
         #print(steps_in_day)
@@ -1490,7 +782,7 @@ def make_model(dataset, symbol, side):
         #dataset_SPY = dataset_SPY[dataset_SPY.index.isin(y_SPY.index)]
 
         if str(side) == 'OrderSide.BUY':
-            side = OrderSide.BUY
+            side = 'OrderSide.BUY'
             if symbol == 'IWM':
                 y = y
             #if symbol == 'SPY':
@@ -1498,7 +790,7 @@ def make_model(dataset, symbol, side):
 
 
         if str(side) == 'OrderSide.SELL':
-            side = OrderSide.SELL
+            side = 'OrderSide.SELL'
             if symbol == 'IWM':
                 y = y_sell
                 dataset = dataset_sell
@@ -1737,7 +1029,7 @@ def trade_data_handler(data):
 
     print('\n Reading CSV... \n')
 
-    data = pd.read_csv('/home/tristan/Downloads/export/2024.3.6TSLAUSUSD-TICK-No Session.csv')
+    data = pd.read_csv('2024.3.10TSLAUSUSD-TICK-No Session.csv')
 
     
     df = pd.DataFrame(data)
