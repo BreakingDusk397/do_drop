@@ -90,7 +90,7 @@ print(datetime.now())
 
 # Required initial values
 inventory_risk = 0.01
-respampling_period = 2
+respampling_period = 10
 res = 0
 column_price = 'open'
 column_high = 'high'
@@ -953,17 +953,17 @@ def trade_data_handler(data):
     #print('\n row: \n', row)
     
     #ask_price_list = pd.concat([ask_price_list, row])
-    ask_price_list['d_vwap'] = d_vwap(df['close'], df['volume'])
-    d_vwap1 = ask_price_list['d_vwap'].resample(str(respampling_period) + 'S').mean()
+    #ask_price_list['d_vwap'] = d_vwap(df['close'], df['volume'])
+    #d_vwap1 = ask_price_list['d_vwap'].resample(str(respampling_period) + 'S').mean()
     volume = df['volume'].resample(str(respampling_period) + 'S').sum()
 
     ask_price_list3 = df['close'].resample(str(respampling_period) + 'S').ohlc()
     ask_price_list3 = pd.merge(left=ask_price_list3, right=volume, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
-    ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
+    #ask_price_list3 = pd.merge(left=ask_price_list3, right=d_vwap1, left_index=True, right_index=True,  how='left', suffixes=('', '_y'))
 
 
     ask_price_list3 = ask_price_list3.ffill()
-    current_vwap = float(ask_price_list3['d_vwap'][-1:])
+    #current_vwap = float(ask_price_list3['d_vwap'][-1:])
 
     print('\n ask_price_list_IWM: \n', ask_price_list3)
     elapsed_time = time.process_time() - t
