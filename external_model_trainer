@@ -395,7 +395,7 @@ def create_features(dataset):
         """
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
-        #sos = butter(4, 0.125, output='sos')
+        #
         
         for i in dataset.columns.tolist():
             dataset[str(i)+'_volu_ratio'] = dataset[i] / dataset["volume"].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
@@ -413,15 +413,20 @@ def create_features(dataset):
         #dataset.plot()
         #plt.show
 
+        for i in dataset.columns.tolist():
+            dataset[str(i)+'_div_Volume'] = dataset[i] / dataset['volume']
+            dataset['div_Volume' + str(i)] =  dataset['volume'] / dataset[i]
+            dataset[str(i)+'_div_variance'] = dataset[i] / dataset['variance']
+            dataset['div_variance' + str(i)] =  dataset['variance'] / dataset[i]
         
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
         
-        
+        sos = butter(4, 0.125, output='sos')
         for i in dataset.columns.tolist():
-            #dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
+            dataset[str(i)+'_sosfiltfilt'] = sosfiltfilt(sos, dataset[i])
             dataset[str(i)+'_savgol'] = savgol_filter(dataset[i], 5, 3)
-            #dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
+            dataset[str(i)+'_smooth_5'] = dataset[i].rolling(5).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             dataset[str(i)+'_smooth_10'] = dataset[i].rolling(10).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
             dataset[str(i)+'_smooth_60'] = dataset[i].rolling(60).mean(engine='numba', engine_kwargs={"nogil":True, "nopython": True,})
         
@@ -710,25 +715,10 @@ def make_model(dataset, symbol, side):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
 
-        dataset_columns = dataset.columns.tolist()
+
         
 
-        dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0.0000001)
-        
-        # Predict one step ahead with linear regression using the last 30 values
-        lr = linear_model.LinearRegression()
-        lookback = 30
-        forward_pred_step = 1
-        for i in dataset_columns:
-            y1 = (dataset[i][-lookback:]).values
-            x1 = (np.arange(0,lookback))
-            x1 = x1.reshape(-1, 1)
-            y1 = y1.reshape(-1, 1)
-            lr.fit(x1,y1)
-            pred = lr.predict([[(lookback + forward_pred_step)]])
-            pred = pred[:,0]
-            dataset[i + '+ f' + str(forward_pred_step) + '+ l' + str(lookback)] = pd.Series(pred)
+
 
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
@@ -743,7 +733,7 @@ def make_model(dataset, symbol, side):
         #print('\n after z_score percent dataset: \n', dataset.describe())
         index1 = dataset.index
         columns_list = dataset.columns.tolist()
-        dataset = winsorize(dataset.values, limits=[0.05, 0.05], inplace=True, nan_policy='propagate')
+        dataset = winsorize(dataset.values, limits=[0.10, 0.10], inplace=True, nan_policy='propagate')
         dataset = pd.DataFrame(dataset, columns=columns_list, index=index1)
         #print('\n after winsorize dataset: \n', dataset)
         
@@ -860,8 +850,8 @@ def make_model(dataset, symbol, side):
 
             
         }
-        tscv = TimeSeriesSplit(n_splits=10, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=2, min_resources=1000, max_resources=50000, cv=tscv, verbose=1, scoring='f1')
+        tscv = TimeSeriesSplit(n_splits=20, gap=2)
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=2, min_resources=1000, max_resources=75000, cv=tscv, verbose=1, scoring='f1')
         
         print("\n X_valid2: \n", X_valid2.describe(), "\n y_valid2: \n", y_valid2.describe())
         print("\n X_valid: \n", X_valid.describe(), "\n y_valid: \n", y_valid.describe())
