@@ -413,26 +413,7 @@ def create_features(dataset):
         #dataset.plot()
         #plt.show
 
-        dataset_columns = dataset.columns.tolist()
         
-
-        dataset = dataset.replace([np.inf, -np.inf], np.nan)
-        dataset = dataset.fillna(0.0000001)
-        
-        # Predict one step ahead with linear regression using the last 30 values
-        lr = linear_model.LinearRegression()
-        lookback = 30
-        forward_pred_step = 1
-        for i in dataset_columns:
-            y = (dataset[i][-lookback:]).values
-            x = (np.arange(0,lookback))
-            x = x.reshape(-1, 1)
-            y = y.reshape(-1, 1)
-            lr.fit(x,y)
-            pred = lr.predict([[(lookback + forward_pred_step)]])
-            pred = pred[:,0]
-            dataset[i + '+' + str(forward_pred_step)] = pd.Series(pred)
-
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
         
@@ -729,6 +710,29 @@ def make_model(dataset, symbol, side):
         dataset = dataset.replace([np.inf, -np.inf], np.nan)
         dataset = dataset.fillna(0.0000001)
 
+        dataset_columns = dataset.columns.tolist()
+        
+
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
+        
+        # Predict one step ahead with linear regression using the last 30 values
+        lr = linear_model.LinearRegression()
+        lookback = 30
+        forward_pred_step = 1
+        for i in dataset_columns:
+            y1 = (dataset[i][-lookback:]).values
+            x1 = (np.arange(0,lookback))
+            x1 = x1.reshape(-1, 1)
+            y1 = y1.reshape(-1, 1)
+            lr.fit(x1,y1)
+            pred = lr.predict([[(lookback + forward_pred_step)]])
+            pred = pred[:,0]
+            dataset[i + '+ f' + str(forward_pred_step) + '+ l' + str(lookback)] = pd.Series(pred)
+
+        dataset = dataset.replace([np.inf, -np.inf], np.nan)
+        dataset = dataset.fillna(0.0000001)
+
         #print('dataset: \n', dataset)
             
         dataset = z_score_df(dataset)
@@ -811,8 +815,9 @@ def make_model(dataset, symbol, side):
         train_ratio = round(len(y)/2)
 
         X_train, X_test, y_train, y_test = train_test_split(dataset[:train_ratio], y[:train_ratio], test_size = 0.55, random_state = 42, shuffle=False)
-        X_valid, y_valid = dataset[30000:], y[30000:]
-        X_valid, X_valid2, y_valid, y_valid2 = train_test_split(X_valid, y_valid, test_size = 0.25, random_state = 42, shuffle=False)
+        train_ratio = train_ratio + 1
+        X_valid, y_valid = dataset[train_ratio:], y[train_ratio:]
+        X_valid, X_valid2, y_valid, y_valid2 = train_test_split(X_valid, y_valid, test_size = 0.35, random_state = 42, shuffle=False)
         
 
         
@@ -851,12 +856,12 @@ def make_model(dataset, symbol, side):
             #'boosting_type': ['Ordered','Plain'],
             #'thread_count':[-1,-1],
             'loss_function': ['Logloss','CrossEntropy'],
-            'eval_metric': ['AUC', 'Precision', 'Recall', 'F1', 'BalancedAccuracy', 'TotalF1', 'BalancedErrorRate', 'PRAUC' ],
+            'eval_metric': ['Logloss','CrossEntropy'],
 
             
         }
         tscv = TimeSeriesSplit(n_splits=10, gap=1)
-        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=2, min_resources=5000, max_resources=50000, cv=tscv, verbose=1, scoring='f1')
+        rscv = HalvingRandomSearchCV(catboost_class, grid, resource='iterations', n_candidates='exhaust', aggressive_elimination=True, factor=2, min_resources=1000, max_resources=50000, cv=tscv, verbose=1, scoring='f1')
         
         print("\n X_valid2: \n", X_valid2.describe(), "\n y_valid2: \n", y_valid2.describe())
         print("\n X_valid: \n", X_valid.describe(), "\n y_valid: \n", y_valid.describe())
@@ -866,7 +871,7 @@ def make_model(dataset, symbol, side):
         best_params = rscv.best_params_
         print("\n best params: \n", rscv.best_params_, rscv.best_score_)
 
-        print("\n best params['max_depth'][0]: \n", best_params['max_depth'][0],)
+        
 
         catboost_class = rscv.best_estimator_
         metric(y_valid2, catboost_class.predict(X_valid2))
@@ -874,7 +879,7 @@ def make_model(dataset, symbol, side):
 
         model = catboost_class
 
-        #model.save_model(f'model_{symbol}_{side}')
+        
 
 
         
@@ -884,129 +889,16 @@ def make_model(dataset, symbol, side):
         #previous_CatBoost = int(y_pred_test[-2:-1])
         print("last", str(symbol), str(side), "output: ", CatBoost_pred)
 
-        
-        """
+        model.save_model(f'model_{symbol}_{side}') 
 
-
-        if int(CatBoost_pred) == 1:
-
-            if str(side) == 'OrderSide.BUY':
-
-                spread = -0.02
-                cancel_orders_for_side(symbol=symbol, side='sell')
-                best_spread = best_bid
-                
-                take_profit = res + (best_spread * 3)
-                if float(best_spread) > -0.01:
-                    best_spread = best_spread + -0.05
-                stop_loss = res + (best_spread * 1)
-                stop_loss = stop_loss - 0.01
-                spread = best_spread
-                current_price = res
-                limit_price = round(current_price + spread, 2)
-
-                print('\n limit_price: \n', limit_price)
-                print('\n stop_loss: \n', stop_loss)
-
-                for i in range(1,5):
-
-                    limit_order(symbol=symbol, 
-                            limit_price=round(limit_price - (float(i)/100), 2),
-                            side=side, 
-                            take_profit = round(take_profit + (float(i)/100), 2),
-                            stop_loss = round(stop_loss - (float(i)/100), 2),
-                            qty = round((1001 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))) + float(i),
-                            inventory_risk = get_inventory_risk(symbol = symbol)
-                            )
-                    
-                
-
-                spread = 0.02
-                cancel_orders_for_side(symbol=symbol, side='buy')
-                best_spread = best_ask
-
-                take_profit = res - (best_spread * 3)
-                
-                if float(best_spread) < 0.01:
-                    best_spread = best_spread + 0.05
-                stop_loss = res + (best_spread * 1)
-                stop_loss = stop_loss + 0.01
-                spread = best_spread
-                current_price = res
-                limit_price = round(current_price + spread, 2)
-                for i in range(1,5):
-                        
-                    limit_order(symbol=symbol, 
-                            limit_price=round(limit_price + (float(i)/100), 2),
-                            side=OrderSide.SELL, 
-                            take_profit = round(take_profit - (float(i)/100), 2),
-                            stop_loss = round(stop_loss + (float(i)/100), 2),
-                            qty = round((1001 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))) + float(i),
-                            inventory_risk = get_inventory_risk(symbol = symbol)
-                            )
-
-
-            if str(side) == 'OrderSide.SELL':
-                
-                spread = 0.02
-                cancel_orders_for_side(symbol=symbol, side='buy')
-                best_spread = best_ask
-                
-                take_profit = res - (best_spread * 3)
-                
-                if float(best_spread) < 0.01:
-                    best_spread = best_spread + 0.05
-                stop_loss = res + (best_spread * 1)
-                stop_loss = stop_loss + 0.01
-                spread = best_spread
-                current_price = res
-                limit_price = round(current_price + spread, 2)
-
-                print('\n limit_price: \n', limit_price)
-                print('\n stop_loss: \n', stop_loss)
-
-                for i in range(1,5):
-                        
-                    limit_order(symbol=symbol, 
-                            limit_price=round(limit_price + (float(i)/100), 2),
-                            side=side, 
-                            take_profit = round(take_profit - (float(i)/100), 2),
-                            stop_loss = round(stop_loss + (float(i)/100), 2),
-                            qty = round((1001 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))) + float(i),
-                            inventory_risk = get_inventory_risk(symbol = symbol)
-                            )
-                    
-                
-                spread = -0.02
-                cancel_orders_for_side(symbol=symbol, side='sell')
-                best_spread = best_bid
-                
-                take_profit = res + (best_spread * 3)
-                if float(best_spread) > -0.01:
-                    best_spread = best_spread + -0.05
-                stop_loss = res + (best_spread * 1)
-                stop_loss = stop_loss - 0.01
-                spread = best_spread
-                current_price = res
-                limit_price = round(current_price + spread, 2)
-
-                for i in range(1,5):
-
-                    limit_order(symbol=symbol, 
-                            limit_price=round(limit_price - (float(i)/100), 2),
-                            side=OrderSide.BUY, 
-                            take_profit = round(take_profit + (float(i)/100), 2),
-                            stop_loss = round(stop_loss - (float(i)/100), 2),
-                            qty = round((1001 * (math.exp((-5 * ((float(get_inventory_risk(symbol = symbol)) - 0.019)/(1 - 0.019))))))) + float(i),
-                            inventory_risk = get_inventory_risk(symbol = symbol)
-                            )
-                            
-                            """
-                    
+        print("\n best params['max_depth'][0]: \n", best_params['max_depth'],)
 
         t1 = time.time()
         total = t1-t0
         print('\n Total time to order: \n', total)
+
+
+
     except:
         print("model error.")  
         print(traceback.format_exc())
